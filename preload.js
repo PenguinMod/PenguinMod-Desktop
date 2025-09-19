@@ -83,8 +83,8 @@ window.addEventListener("DOMContentLoaded", () => {
                 console.log('Attempting to launch');
                 // TODO: we should start on a port that is not 5173 (should be exclusive to launcher so not 5174 either)
                 //       api needs to be able to handle that btw
-                const runningPort = 5173;
-                const queryIntervalUrl = `http://localhost:${runningPort}/dot_blue.png`;
+                const runningPort = 54642;
+                const queryIntervalUrl = `http://localhost:${runningPort}/favicon.png`;
                 console.log('running');
                 ipcRenderer.invoke('beginHomeProcess');
                 // continously try to access a file until it succeeds (this is because running as dev never exits)

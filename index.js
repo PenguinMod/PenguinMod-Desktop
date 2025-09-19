@@ -76,9 +76,9 @@ ipcMain.handle("beginHomeProcess", () => {
         existingHomeProcess.kill('SIGINT');
     }
 
-    const extractedArchivesPath = path.resolve("./penguinmod/compilation/extraction");
-    const homePagePath = path.join(extractedArchivesPath, 'PenguinMod-Home-main');
-    const command = `cd ${JSON.stringify(homePagePath)} && npm run dev --force`;
+    const extractedArchivesPath = path.resolve("./penguinmod/compilation/extractiongui");
+    const homePagePath = path.join(extractedArchivesPath, 'penguinmod.github.io-develop');
+    const command = `cd ${JSON.stringify(homePagePath)} && npm run start`;
     const process = childProcess.spawn(command, { shell: true });
     existingHomeProcess = process;
     
@@ -94,8 +94,8 @@ ipcMain.handle("beginHomeProcess", () => {
     });
 });
 ipcMain.handle("goToHome", () => {
-    // TODO: we should not use port 5173
-    window.loadURL('http://localhost:5173/');
+    // TODO: we should not use port 5173 FIXED(?)
+    window.loadURL('http://localhost:54642/');
 });
 app.on("window-all-closed", () => {
     if (existingHomeProcess) {

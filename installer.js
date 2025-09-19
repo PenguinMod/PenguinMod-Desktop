@@ -214,7 +214,7 @@ class Installer {
             Installer.log('Extracting archive...');
 
             // we made this dir earlier to make sure we could but just remake it to clear its contents
-            const extractedArchivePath = path.resolve(path.join(filepath, "/extraction"));
+            const extractedArchivePath = path.resolve(path.join(filepath, "/extractionhome"));
             Installer.fs.rmSync(extractedArchivePath, { recursive: true, force: true });
             Installer.fs.mkdirSync(extractedArchivePath, { recursive: true });
 
@@ -247,7 +247,7 @@ class Installer {
             await waitingExtraction;
         })();
         // Install GUI
-        /*
+        
         Installer.log(`Grabbing repository from "${archivePath}"`);
         await (async () => {
             let response;
@@ -293,7 +293,7 @@ class Installer {
             Installer.log('Extracting archive...');
 
             // we made this dir earlier to make sure we could but just remake it to clear its contents
-            const extractedArchivePath = path.resolve(path.join(filepath, "/extraction"));
+            const extractedArchivePath = path.resolve(path.join(filepath, "/extractiongui"));
             Installer.fs.rmSync(extractedArchivePath, { recursive: true, force: true });
             Installer.fs.mkdirSync(extractedArchivePath, { recursive: true });
 
@@ -325,18 +325,40 @@ class Installer {
             });
             await waitingExtraction;
         })();
-        // */
+        
 
         // ---- COMPILATION ----
-        const extractedArchivesPath = path.resolve(path.join(filepath, "/extraction"));
+        const extractedHomeArchivesPath = path.resolve(path.join(filepath, "/extractionhome"));
+        const extractedGuiArchivesPath = path.resolve(path.join(filepath, "/extractiongui"));
+
         // Compile Home Page
-        const homePagePath = path.join(extractedArchivesPath, 'PenguinMod-Home-main');
-        Installer.log('Downloading all dependencies for Home, please wait...');
-        // we cant actually compile svelte locally, so we will just run in dev later
-        await Installer.exec(`cd ${JSON.stringify(homePagePath)} && npm i --force`);
+        const homePagePath = path.join(extractedHomeArchivesPath, 'PenguinMod-Home-main');
+            Installer.log('Downloading all dependencies for Home, please wait...');
+            // we cant actually compile svelte locally, so we will just run in dev later
+            try {
+                const result = await Installer.exec(`cd ${JSON.stringify(homePagePath)} && npm i --force`);
+                if (result && result.error) {
+                    Installer.log('Dependency install failed: ' + JSON.stringify(result));
+                    throw new Error('Dependency install failed: ' + JSON.stringify(result));
+                }
+            } catch (err) {
+                Installer.log('Dependency install threw: ' + (err && err.stack ? err.stack : err));
+                throw err;
+            }
         // Compile GUI page
-        /*
-        // */
+        const editorPagePath = path.join(extractedGuiArchivesPath, 'penguinmod.github.io-develop');
+            Installer.log('Downloading all dependencies for Editor, please wait...');
+            // we cant actually compile svelte locally, so we will just run in dev later
+            try {
+                const result = await Installer.exec(`cd ${JSON.stringify(editorPagePath)} && npm i --force`);
+                if (result && result.error) {
+                    Installer.log('Dependency install failed: ' + JSON.stringify(result));
+                    throw new Error('Dependency install failed: ' + JSON.stringify(result));
+                }
+            } catch (err) {
+                Installer.log('Dependency install threw: ' + (err && err.stack ? err.stack : err));
+                throw err;
+            }
 
         // create the verification file (used by the base program to see if penguinmod is even installed at all)
         Installer.log('Creating verification...');
