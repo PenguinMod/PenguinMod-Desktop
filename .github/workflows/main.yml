@@ -101,7 +101,7 @@ jobs:
       - name: Upload Linux .deb
         run: echo "ARTIFACT_NAME=$(basename builds/*.deb)" >> $GITHUB_ENV
       - name: Upload Linux .deb artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/*.deb
@@ -111,7 +111,7 @@ jobs:
       - name: Upload Linux .rpm
         run: echo "ARTIFACT_NAME=$(basename builds/*.rpm)" >> $GITHUB_ENV
       - name: Upload Linux .rpm artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/*.rpm
@@ -121,7 +121,7 @@ jobs:
       - name: Upload Linux AppImage
         run: echo "ARTIFACT_NAME=$(basename builds/*.AppImage)" >> $GITHUB_ENV
       - name: Upload Linux AppImage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/*.AppImage
@@ -131,7 +131,7 @@ jobs:
       - name: Upload linux-unpacked
         run: echo "ARTIFACT_NAME=$(basename builds/linux-unpacked.zip)" >> $GITHUB_ENV
       - name: Upload linux-unpacked artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/linux-unpacked.zip
@@ -141,7 +141,7 @@ jobs:
       - name: Upload win-unpacked
         run: echo "ARTIFACT_NAME=$(basename builds/win-unpacked.zip)" >> $GITHUB_ENV
       - name: Upload win-unpacked artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/win-unpacked.zip
@@ -151,7 +151,7 @@ jobs:
       - name: Upload Windows installer
         run: echo "ARTIFACT_NAME=$(basename builds/*.exe)" >> $GITHUB_ENV
       - name: Upload Windows installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/*.exe
