@@ -90,43 +90,69 @@ jobs:
       - name: Build Electron App
         run: npx electron-builder --linux AppImage deb rpm --win nsis --publish never
 
-      # Upload individual packaged files as separate artifacts
-      - name: Upload Linux .deb
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-deb
-          path: builds/*.deb
-
-      - name: Upload Linux .rpm
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-rpm
-          path: builds/*.rpm
-
-      - name: Upload Linux AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-appimage
-          path: builds/*.AppImage
-
-      - name: Zip and upload linux-unpacked
+      # --- Zip unpacked folders first ---
+      - name: Zip linux-unpacked
         run: zip -r builds/linux-unpacked.zip builds/linux-unpacked
-      - name: Upload linux-unpacked
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-unpacked
-          path: builds/linux-unpacked.zip
-
-      - name: Zip and upload win-unpacked
+      
+      - name: Zip win-unpacked
         run: zip -r builds/win-unpacked.zip builds/win-unpacked
+      
+      # --- Upload Linux .deb ---
+      - name: Upload Linux .deb
+        run: echo "ARTIFACT_NAME=$(basename builds/*.deb)" >> $GITHUB_ENV
+      - name: Upload Linux .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: builds/*.deb
+          archive: false
+      
+      # --- Upload Linux .rpm ---
+      - name: Upload Linux .rpm
+        run: echo "ARTIFACT_NAME=$(basename builds/*.rpm)" >> $GITHUB_ENV
+      - name: Upload Linux .rpm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: builds/*.rpm
+          archive: false
+      
+      # --- Upload Linux AppImage ---
+      - name: Upload Linux AppImage
+        run: echo "ARTIFACT_NAME=$(basename builds/*.AppImage)" >> $GITHUB_ENV
+      - name: Upload Linux AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: builds/*.AppImage
+          archive: false
+      
+      # --- Upload linux-unpacked zip ---
+      - name: Upload linux-unpacked
+        run: echo "ARTIFACT_NAME=$(basename builds/linux-unpacked.zip)" >> $GITHUB_ENV
+      - name: Upload linux-unpacked artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: builds/linux-unpacked.zip
+          archive: false
+      
+      # --- Upload win-unpacked zip ---
       - name: Upload win-unpacked
+        run: echo "ARTIFACT_NAME=$(basename builds/win-unpacked.zip)" >> $GITHUB_ENV
+      - name: Upload win-unpacked artifact
         uses: actions/upload-artifact@v4
         with:
-          name: win-unpacked
+          name: ${{ env.ARTIFACT_NAME }}
           path: builds/win-unpacked.zip
-
-      - name: Upload Windows Installer
+          archive: false
+      
+      # --- Upload Windows installer .exe ---
+      - name: Upload Windows installer
+        run: echo "ARTIFACT_NAME=$(basename builds/*.exe)" >> $GITHUB_ENV
+      - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: win-installer
+          name: ${{ env.ARTIFACT_NAME }}
           path: builds/*.exe
+          archive: false
