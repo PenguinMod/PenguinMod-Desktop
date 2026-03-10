@@ -72,14 +72,19 @@ jobs:
       # Build PenguinMod
       - name: Build PenguinMod
         run: |
-          cd penguinmod.github.io
-          bun run build
-          cp -R build ../app
-          cp package.json ../app/
+            cd penguinmod.github.io
+            bun run build
+            # copy the static web build to repo-root/app
+            cp -R build ../app
+            cd ..
+            # DO NOT copy the web project's package.json into app/
+            # ensure no stray package.json or node_modules in app/
+            rm -f app/package.json
+            rm -rf app/node_modules
 
       # Install Electron deps
       - name: Install Electron dependencies
-        run: npm install # using npm instead of bun is important here!
+        run: bun install
 
       # Build Desktop App
       - name: Build Electron App
