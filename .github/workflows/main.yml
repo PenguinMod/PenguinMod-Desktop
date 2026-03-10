@@ -79,7 +79,7 @@ jobs:
 
       # Install Electron deps
       - name: Install Electron dependencies
-        run: bun install
+        run: npm install # using npm instead of bun is important here!
 
       # Build Desktop App
       - name: Build Electron App
