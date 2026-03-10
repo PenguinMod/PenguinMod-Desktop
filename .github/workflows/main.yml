@@ -21,6 +21,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y git curl jq
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y wine32 wine64
 
       # Clone PenguinMod
       - name: Clone PenguinMod GUI
