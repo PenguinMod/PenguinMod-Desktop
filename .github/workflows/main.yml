@@ -4,14 +4,11 @@ on:
   workflow_dispatch:
   push:
   schedule:
-    - cron: '0 6 * * *' # midnight CST
+    - cron: '0 6 * * *'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      TAG: ${{ github.ref_name }}
-      NODE_OPTIONS: --openssl-legacy-provider
 
     steps:
       - name: Checkout
@@ -20,101 +17,76 @@ jobs:
       - name: Install Bun
         uses: oven-sh/setup-bun@v1
 
-      - name: Install unzip and zip
-        run: sudo apt-get update && sudo apt-get install -y unzip zip curl git jq
-
-      - name: Clean workspace
+      - name: Install system dependencies
         run: |
-          rm -rf packager-app app/build linux-base windows-base \
-                 penguinmod-linux.zip penguinmod-windows.zip penguinmod.github.io
+          sudo apt-get update
+          sudo apt-get install -y git curl jq
 
-      - name: Get latest Electron release
-        id: electron
-        run: |
-          LATEST=$(curl -s https://api.github.com/repos/electron/electron/releases/latest | jq -r .tag_name)
-          echo "LATEST=$LATEST" >> $GITHUB_ENV
-          echo "Latest Electron release: $LATEST"
-
-      - name: Download Electron (Linux)
-        run: |
-          curl -L https://github.com/electron/electron/releases/download/${LATEST}/electron-${LATEST}-linux-x64.zip -o linux.zip
-          unzip linux.zip -d linux-base
-          rm linux.zip linux-base/resources/default_app.asar
-
-      - name: Download Electron (Windows)
-        run: |
-          curl -L https://github.com/electron/electron/releases/download/${LATEST}/electron-${LATEST}-win32-ia32.zip -o windows.zip
-          unzip windows.zip -d windows-base
-          rm windows.zip windows-base/resources/default_app.asar
-
+      # Clone PenguinMod
       - name: Clone PenguinMod GUI
         run: |
           git clone --depth=1 https://github.com/PenguinMod/penguinmod.github.io.git
           cd penguinmod.github.io
-          git pull
           bun i --force
 
       - name: Clone PenguinMod VM
         run: |
           cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Vm.git
-          cd PenguinMod-Vm && git pull && bun i --force
+          cd PenguinMod-Vm
+          bun i --force
           cd ..
-          cp -R PenguinMod-Vm node_modules
           rm -rf node_modules/scratch-vm
-          mv node_modules/PenguinMod-Vm node_modules/scratch-vm
+          mv PenguinMod-Vm node_modules/scratch-vm
 
       - name: Clone PenguinMod Blocks
         run: |
           cd penguinmod.github.io
           git clone --depth=1 -b develop-builds https://github.com/PenguinMod/PenguinMod-Blocks.git
-          cd PenguinMod-Blocks && git pull && bun i --force
+          cd PenguinMod-Blocks
+          bun i --force
           cd ..
-          cp -R PenguinMod-Blocks node_modules
           rm -rf node_modules/scratch-blocks
-          mv node_modules/PenguinMod-Blocks node_modules/scratch-blocks
+          mv PenguinMod-Blocks node_modules/scratch-blocks
 
       - name: Clone PenguinMod Renderer
         run: |
           cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Render.git
-          cd PenguinMod-Render && git pull && bun i --force
+          cd PenguinMod-Render
+          bun i --force
           cd ..
-          cp -R PenguinMod-Render node_modules
           rm -rf node_modules/scratch-render
-          mv node_modules/PenguinMod-Render node_modules/scratch-render
+          mv PenguinMod-Render node_modules/scratch-render
 
       - name: Clone PenguinMod Paint
         run: |
           cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Paint.git
-          cd PenguinMod-Paint && git pull && bun i --force
+          cd PenguinMod-Paint
+          bun i --force
           cd ..
-          cp -R PenguinMod-Paint node_modules
           rm -rf node_modules/scratch-paint
-          mv node_modules/PenguinMod-Paint node_modules/scratch-paint
+          mv PenguinMod-Paint node_modules/scratch-paint
 
+      # Build PenguinMod
       - name: Build PenguinMod
         run: |
           cd penguinmod.github.io
-          bun run --silent build
+          bun run build
           cp -R build ../app
-          cd ..
-          cp -R app linux-base/resources/
-          cp -R app windows-base/resources/
-          mv linux-base/electron linux-base/penguinmod-desktop
-          mv windows-base/electron.exe windows-base/penguinmod-desktop.exe
-          
-      - name: Upload linux zip
+          cp package.json ../app/
+
+      # Install Electron deps
+      - name: Install Electron dependencies
+        run: bun install
+
+      # Build Desktop App
+      - name: Build Electron App
+        run: npx electron-builder --linux AppImage deb rpm --win nsis
+
+      - name: Upload builds
         uses: actions/upload-artifact@v4
         with:
-          name: nodejs-deskpenguin-linux
-          path: |
-            linux-base
-      
-      - name: Upload windows zip
-        uses: actions/upload-artifact@v4
-        with:
-          name: nodejs-deskpenguin-windows
-          path: |
-            windows-base
+          name: penguinmod-desktop-builds
+          path: builds
