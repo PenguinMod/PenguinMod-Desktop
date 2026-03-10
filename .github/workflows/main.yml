@@ -20,12 +20,12 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git curl jq
+          sudo apt-get install -y git curl jq zip unzip
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y wine32 wine64
 
-      # Clone PenguinMod
+      # Clone PenguinMod GUI and submodules
       - name: Clone PenguinMod GUI
         run: |
           git clone --depth=1 https://github.com/PenguinMod/penguinmod.github.io.git
@@ -72,29 +72,61 @@ jobs:
           rm -rf node_modules/scratch-paint
           mv PenguinMod-Paint node_modules/scratch-paint
 
-      # Build PenguinMod
+      # Build web app
       - name: Build PenguinMod
         run: |
-            cd penguinmod.github.io
-            bun run build
-            # copy the static web build to repo-root/app
-            cp -R build ../app
-            cd ..
-            # DO NOT copy the web project's package.json into app/
-            # ensure no stray package.json or node_modules in app/
-            rm -f app/package.json
-            rm -rf app/node_modules
+          cd penguinmod.github.io
+          bun run build
+          cp -R build ../app
+          cd ..
+          rm -f app/package.json
+          rm -rf app/node_modules
 
       # Install Electron deps
-      - name: Install Electron dependencies
-        run: bun install
+      - name: Install Electron deps
+        run: npm install
 
-      # Build Desktop App
+      # Build desktop app
       - name: Build Electron App
         run: npx electron-builder --linux AppImage deb rpm --win nsis --publish never
 
-      - name: Upload builds
+      # Upload individual packaged files as separate artifacts
+      - name: Upload Linux .deb
         uses: actions/upload-artifact@v4
         with:
-          name: penguinmod-desktop-builds
-          path: builds
+          name: linux-deb
+          path: builds/*.deb
+
+      - name: Upload Linux .rpm
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-rpm
+          path: builds/*.rpm
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: builds/*.AppImage
+
+      - name: Zip and upload linux-unpacked
+        run: zip -r builds/linux-unpacked.zip builds/linux-unpacked
+      - name: Upload linux-unpacked
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-unpacked
+          path: builds/linux-unpacked.zip
+
+      - name: Zip and upload win-unpacked
+        run: zip -r builds/win-unpacked.zip builds/win-unpacked
+      - name: Upload win-unpacked
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-unpacked
+          path: builds/win-unpacked.zip
+
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-installer
+          path: builds/*.exe
