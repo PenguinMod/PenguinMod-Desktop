@@ -16,11 +16,15 @@
       "output": "builds"
     },
     "files": [
-      "app/**/*"
+      "app/**/*",
+      "electron-main.js"
     ],
     "compression": "maximum",
-    "npmRebuild": false,
     "publish": null,
+    "buildDependenciesFromSource": false,
+    "asar": true,
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
     "linux": {
       "category": "Development",
       "icon": "app/icon.png",
@@ -28,15 +32,27 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64", "arm64", "armv7l"]
+          "arch": [
+            "x64",
+            "arm64",
+            "armv7l"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64", "arm64", "armv7l"]
+          "arch": [
+            "x64",
+            "arm64",
+            "armv7l"
+          ]
         },
         {
           "target": "rpm",
-          "arch": ["x64", "arm64", "armv7l"]
+          "arch": [
+            "x64",
+            "arm64",
+            "armv7l"
+          ]
         }
       ]
     },
@@ -44,7 +60,11 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "ia32", "arm64"]
+          "arch": [
+            "x64",
+            "ia32",
+            "arm64"
+          ]
         }
       ],
       "signAndEditExecutable": false,
