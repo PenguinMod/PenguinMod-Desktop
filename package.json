@@ -3,7 +3,7 @@
   "author": "FreshPenguin112 <freshpenguin112@gmail.com>",
   "description": "A fork of TheShovel's Desk-Penguin that supports Node.js",
   "version": "1.0.0",
-  "main": "electron-main.js",
+  "main": "app/electron-main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
@@ -16,13 +16,12 @@
       "output": "builds"
     },
     "files": [
-      "app/**/*",
-      "electron-main.js"
+      "app/**/*"
     ],
     "compression": "maximum",
     "publish": null,
     "buildDependenciesFromSource": false,
-    "asar": true,
+    "asar": false,
     "npmRebuild": false,
     "nodeGypRebuild": false,
     "linux": {
