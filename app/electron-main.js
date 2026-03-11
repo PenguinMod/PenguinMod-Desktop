@@ -132,33 +132,70 @@ function createWindow(startFile) {
     }
   });
 
-  // Best-effort prompt (synchronous fallback)
-  ipcMain.on('electron-prompt', (event, { message, defaultValue = '', opts = {} }) => {
-    try {
-      // NOTE: Electron does not expose a native synchronous text-input dialog.
-      // As a pragmatic fallback we show a MessageBoxSync that returns whether
-      // the user accepts; if they accept, we return the defaultValue (not a typed value).
-      // If typed input is required you should allow async prompt flows and we can
-      // implement a modal BrowserWindow for input (async). See comments below.
-      const choice = dialog.showMessageBoxSync(mainWindow, {
-        type: opts.type || 'question',
-        buttons: ['OK', 'Cancel'],
-        defaultId: 0,
-        cancelId: 1,
-        message: String(message ?? ''),
-        detail: (opts.detail ? opts.detail + '\n\n' : '') + `Default: ${String(defaultValue)}`,
-        noLink: true
-      });
+  ipcMain.on('electron-prompt-sync', (event, { message, defaultValue }) => {
+    const parent = BrowserWindow.fromWebContents(event.sender);
 
-      if (choice === 0) {
-        event.returnValue = String(defaultValue);
-      } else {
-        event.returnValue = null;
-      }
-    } catch (e) {
-      console.error('[main] electron-prompt dialog failed', e);
-      event.returnValue = null;
-    }
+    let result = null;
+    const promptWindow = new BrowserWindow({
+      width: 420,
+      height: 170,
+      parent,
+      modal: true,
+      show: false,
+      frame: false,
+      resizable: false,
+      alwaysOnTop: true,
+      webPreferences: { nodeIntegration: true, contextIsolation: false }
+    });
+
+    const escapeHtml = s =>
+      String(s ?? '').replace(/[&<>"'`]/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c])
+      );
+
+    const html = `
+    <html>
+    <body style="font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;margin:0;padding:12px;">
+    <div style="margin-bottom:10px;text-align:center;">${escapeHtml(message)}</div>
+    <input id="input" style="width:92%;padding:6px;margin-bottom:10px;" value="${escapeHtml(defaultValue)}"/>
+    <div style="display:flex;gap:8px;">
+    <button id="ok">OK</button>
+    <button id="cancel">Cancel</button>
+    </div>
+    <script>
+    const { ipcRenderer } = require('electron');
+    const input = document.getElementById('input');
+    const ok = document.getElementById('ok');
+    const cancel = document.getElementById('cancel');
+
+    ok.onclick = () => {
+      ipcRenderer.send('electron-prompt-done-sync', input.value);
+    };
+    cancel.onclick = () => {
+      ipcRenderer.send('electron-prompt-done-sync', null);
+    };
+
+    input.addEventListener('keydown', e => {
+      if(e.key === 'Enter') ok.click();
+      if(e.key === 'Escape') cancel.click();
+    });
+
+      input.focus();
+      input.select();
+      </script>
+      </body>
+      </html>
+      `;
+
+    // listen for user response
+    ipcMain.once('electron-prompt-done-sync', (ev, val) => {
+      result = val;
+      try { promptWindow.destroy(); } catch (_) { }
+      event.returnValue = result; // this sends back to renderer synchronously
+    });
+
+    promptWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    promptWindow.once('ready-to-show', () => promptWindow.show());
   });
 
   //
@@ -167,13 +204,33 @@ function createWindow(startFile) {
   // you said you want the user to decide — the preload will route
   // confirm/prompt/alert into main dialogs so the user still sees UI.
   //
-  mainWindow.webContents.on('will-prevent-unload', (event) => {
-    console.log('[main] will-prevent-unload fired — renderer attempted to block unload');
-    // Let the renderer show its prompt (we've already overridden it via preload),
-    // so don't force unload here. If you want to force in some cases, add conditional logic.
-    // (If the renderer is unresponsive or crashed, we handle that elsewhere.)
-  });
+  let isUnloadDialogOpen = false;
 
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    if (isUnloadDialogOpen) {
+      console.log('[main] will-prevent-unload fired, but dialog already open — skipping');
+      return;
+    }
+
+    isUnloadDialogOpen = true;
+
+    const { dialog } = require('electron');
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'warning',
+      buttons: ['Leave', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+      message: 'The page is trying to prevent unload. Do you want to leave?',
+      detail: 'Any unsaved changes may be lost.'
+    });
+
+    isUnloadDialogOpen = false;
+
+    if (choice === 0) {
+      // allow unload
+      event.preventDefault();
+    }
+  });
   // Renderer crashed / gone
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('[main] render-process-gone:', details);
@@ -204,7 +261,7 @@ function createWindow(startFile) {
       mainWindow.reload();
     } catch (e) {
       console.error('[main] reload failed after crash, destroying and recreating', e);
-      try { mainWindow.destroy(); } catch (_) {}
+      try { mainWindow.destroy(); } catch (_) { }
       createWindow(process.argv[2] || 'index.html');
     }
   });

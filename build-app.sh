@@ -13,6 +13,7 @@ export NODE_OPTIONS=--openssl-legacy-provider
 git clone --depth=1 https://github.com/PenguinMod/penguinmod.github.io
 cd penguinmod.github.io
 git pull
+rm package-lock.json
 bun i --force
 
 echo "=== Adding VM ==="
@@ -59,9 +60,11 @@ echo "=== Building PenguinMod ==="
 NODE_ENV="production" bun run --silent build
 cp -R build ../app
 cd ..
+mkdir -p app/node_modules
+cp -R node_modules/deasync app/node_modules/
 
-echo "=== Packaging all platforms with electron-builder ==="
-bun exec electron-builder --config electron-builder.json
+#echo "=== Packaging all platforms with electron-builder ==="
+#bun exec electron-builder --config electron-builder.json
 
-echo "=== All builds complete! ==="
-ls -lh "$BUILD_DIR"
+#echo "=== All builds complete! ==="
+#ls -lh "$BUILD_DIR"

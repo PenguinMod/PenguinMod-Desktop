@@ -80,7 +80,8 @@ jobs:
           cp -R build ../app
           cd ..
           rm -f app/package.json
-          rm -rf app/node_modules
+          mkdir -p app/node_modules
+          cp -R node_modules/deasync app/node_modules/
 
       # Install Electron deps
       - name: Install Electron deps
