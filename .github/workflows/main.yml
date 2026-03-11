@@ -24,6 +24,8 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y wine32 wine64
+          mkdir -p node_modules
+          bun i --force # install deasync mainly
 
       # Clone PenguinMod GUI and submodules
       - name: Clone PenguinMod GUI
