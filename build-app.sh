@@ -60,8 +60,6 @@ echo "=== Building PenguinMod ==="
 NODE_ENV="production" bun run --silent build
 cp -R build ../app
 cd ..
-mkdir -p app/node_modules
-cp -R node_modules/deasync app/node_modules/
 
 #echo "=== Packaging all platforms with electron-builder ==="
 #bun exec electron-builder --config electron-builder.json

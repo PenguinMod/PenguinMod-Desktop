@@ -134,18 +134,23 @@ function createWindow(startFile) {
 
   ipcMain.on('electron-prompt-sync', (event, { message, defaultValue }) => {
     const parent = BrowserWindow.fromWebContents(event.sender);
-
     let result = null;
+
     const promptWindow = new BrowserWindow({
-      width: 420,
-      height: 170,
+      width: 400,
+      height: 150,
       parent,
       modal: true,
       show: false,
       frame: false,
+      transparent: false,
+      backgroundColor: '#ffffff',
       resizable: false,
       alwaysOnTop: true,
-      webPreferences: { nodeIntegration: true, contextIsolation: false }
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
     });
 
     const escapeHtml = s =>
@@ -154,44 +159,149 @@ function createWindow(startFile) {
       );
 
     const html = `
+    <!DOCTYPE html>
     <html>
-    <body style="font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;margin:0;padding:12px;">
-    <div style="margin-bottom:10px;text-align:center;">${escapeHtml(message)}</div>
-    <input id="input" style="width:92%;padding:6px;margin-bottom:10px;" value="${escapeHtml(defaultValue)}"/>
-    <div style="display:flex;gap:8px;">
-    <button id="ok">OK</button>
+    <head>
+    <meta charset="UTF-8">
+
+    <style>
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: transparent;
+    }
+
+    .wrapper {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      box-sizing: border-box;
+    }
+
+    .dialog {
+      width: 100%;
+      background: white;
+      border-radius: 12px;
+      padding: 18px;
+      box-sizing: border-box;
+    }
+
+    .message {
+      font-size: 14px;
+      margin-bottom: 14px;
+      line-height: 1.45;
+      max-height: 90px;
+      overflow: auto;
+    }
+
+    /* scrollbar only visible when needed */
+    .message::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .message::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.2);
+      border-radius: 4px;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-bottom: 18px;
+      box-sizing: border-box;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #007aff;
+      box-shadow: 0 0 0 2px rgba(0,122,255,0.25);
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    button {
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+
+    #cancel {
+    background: #f1f1f1;
+    }
+
+    #cancel:hover {
+    background: #e4e4e4;
+    }
+
+    #ok {
+    background: #007aff;
+    color: white;
+    }
+
+    #ok:hover {
+    background: #0062cc;
+    }
+
+    </style>
+    </head>
+
+    <body>
+
+    <div class="wrapper">
+    <div class="dialog">
+
+    <div class="message">${escapeHtml(message)}</div>
+
+    <input id="input" value="${escapeHtml(defaultValue)}">
+
+    <div class="buttons">
     <button id="cancel">Cancel</button>
+    <button id="ok">OK</button>
     </div>
+
+    </div>
+    </div>
+
     <script>
     const { ipcRenderer } = require('electron');
+
     const input = document.getElementById('input');
     const ok = document.getElementById('ok');
     const cancel = document.getElementById('cancel');
 
-    ok.onclick = () => {
-      ipcRenderer.send('electron-prompt-done-sync', input.value);
-    };
-    cancel.onclick = () => {
-      ipcRenderer.send('electron-prompt-done-sync', null);
-    };
+    ok.onclick = () => ipcRenderer.send('electron-prompt-done-sync', input.value);
+    cancel.onclick = () => ipcRenderer.send('electron-prompt-done-sync', null);
 
     input.addEventListener('keydown', e => {
-      if(e.key === 'Enter') ok.click();
-      if(e.key === 'Escape') cancel.click();
+      if (e.key === 'Enter') ok.click();
+      if (e.key === 'Escape') cancel.click();
     });
 
       input.focus();
       input.select();
       </script>
+
       </body>
       </html>
       `;
 
-    // listen for user response
     ipcMain.once('electron-prompt-done-sync', (ev, val) => {
       result = val;
-      try { promptWindow.destroy(); } catch (_) { }
-      event.returnValue = result; // this sends back to renderer synchronously
+      try { promptWindow.destroy(); } catch { }
+      event.returnValue = result;
     });
 
     promptWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));

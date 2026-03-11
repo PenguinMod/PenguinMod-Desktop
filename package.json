@@ -73,8 +73,5 @@
   "devDependencies": {
     "electron": "latest",
     "electron-builder": "latest"
-  },
-  "dependencies": {
-    "deasync": "^0.1.31"
   }
 }
