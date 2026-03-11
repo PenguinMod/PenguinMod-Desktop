@@ -70,6 +70,23 @@ function createWindow(startFile) {
     }
   });
 
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+  const { dialog } = require('electron');
+
+  const result = dialog.showMessageBoxSync(mainWindow, {
+    type: 'question',
+    buttons: ['Leave', 'Stay'],
+    defaultId: 1,
+    cancelId: 1,
+    message: 'You have unsaved changes. Leave anyway?'
+  });
+
+  if (result === 0) {
+    // allow close
+    event.preventDefault();
+  }
+});
+
   mainWindow.webContents.on('console-message', (_, level, message, line, sourceId) => {
     const prefix = `[renderer:${sourceId}:${line}]`;
     if (level >= 2) console.error(`${prefix} ${message}`);
