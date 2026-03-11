@@ -24,8 +24,6 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y wine32 wine64
-          mkdir -p node_modules
-          bun i --force # install deasync mainly
 
       # Clone PenguinMod GUI and submodules
       - name: Clone PenguinMod GUI
@@ -74,6 +72,10 @@ jobs:
           rm -rf node_modules/scratch-paint
           mv PenguinMod-Paint node_modules/scratch-paint
 
+  
+      - name: Install deps
+        run: bun i --force
+
       # Build web app
       - name: Build PenguinMod
         run: |
@@ -84,10 +86,6 @@ jobs:
           rm -f app/package.json
           mkdir -p app/node_modules
           cp -R node_modules/deasync app/node_modules/
-
-      # Install Electron deps
-      - name: Install Electron deps
-        run: npm install
 
       # Build desktop app
       - name: Build Electron App
