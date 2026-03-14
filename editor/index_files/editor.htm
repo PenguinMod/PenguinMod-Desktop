@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+		<meta charset="utf-8">
+		
+		<meta property="theme-color" content="#51D3F4">
+		<meta property="og:type" content="website">
+		<meta property="og:image" content="https://penguinmod.com/favicon.ico">
+		<meta property="twitter:image" content="https://penguinmod.com/favicon.ico">
+
+		<link rel="icon" href="https://penguinmod.com/favicon.ico">
+		<meta name="viewport" content="width=device-width">
+
+		<!-- Google tag (gtag.js) -->
+		<script async="" src="js"></script>
+		<script>
+		  window.dataLayer = window.dataLayer || [];
+		  function gtag(){dataLayer.push(arguments);}
+		  gtag('js', new Date());
+		
+		  gtag('config', 'G-JEVT078EB6');
+		</script>
+
+		
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/entry/start.18aa7819.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/chunks/index.b6f4cff3.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/chunks/singletons.ba1fd385.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/entry/app.33a5b295.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/chunks/preload-helper.a4192956.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/nodes/0.07e58e5b.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/nodes/13.05c8e490.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/chunks/authentication.6afd93f6.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/chunks/public.58158c24.js">
+		<link rel="modulepreload" href="https://penguinmod.com/_app/immutable/chunks/_commonjsHelpers.de833af9.js">
+		
+		<style>
+			.guidelines-warning-box {
+				padding: 8px;
+				border-radius: 4px;
+				border: 1px solid rgb(255, 153, 0);
+				background: rgb(255, 217, 0, 0.5);
+				color: black;
+			}
+			body.dark-mode .guidelines-warning-box {
+				color: white;
+				background: rgb(255, 217, 0, 0.2);
+			}
+
+			.profile-bio-emoji {
+				width: 1.4lh;
+				height: 1.4lh;
+				object-fit: contain;
+				vertical-align: bottom;
+			}
+			em .profile-bio-emoji {
+			    transform: skew(-12deg, 0deg);
+			}
+			strong .profile-bio-emoji {
+			    filter: contrast(2);
+			}
+			s .profile-bio-emoji {
+			    filter: blur(2px);
+			}
+
+    		.donate-card-html p,
+    		.donate-card-html h1 {
+    		    margin-block: 0;
+    		}
+    		.donate-card-html h1 {
+    		    font-size: 48px;
+    		}
+		</style>
+	<link rel="modulepreload" as="script" crossorigin="" href="https://penguinmod.com/_app/immutable/nodes/1.7ca1ab81.js"><link rel="modulepreload" as="script" crossorigin="" href="https://penguinmod.com/_app/immutable/chunks/stores.7344a8e5.js"><link rel="modulepreload" as="script" crossorigin="" href="https://penguinmod.com/_app/immutable/chunks/NavMargin.9d44250e.js"><link rel="modulepreload" as="script" crossorigin="" href="https://penguinmod.com/_app/immutable/chunks/language.41c426a2.js"><link rel="stylesheet" href="editor_data/NavMargin.560afa32.css"><link rel="modulepreload" as="script" crossorigin="" href="https://penguinmod.com/_app/immutable/chunks/Button.436c0131.js"><link rel="stylesheet" href="editor_data/Button.0a24db6e.css"><link rel="stylesheet" href="editor_data/1.e484700b.css"></head>
+	<body data-sveltekit-preload-data="hover" id="PAGE_BODY">
+		<script>
+			/**
+			 * Stringifies objects
+			 * @param {any} obj The object to stringify
+			 * @param {Array<[string, any]>} processed List of keys that have been processed, for circularity checking
+			 * @param {string} path The JSON path for that this call is at
+			 * @returns {string} The stringified results
+			 */
+			const stringify = (obj, processed, path = '') => {
+				try {
+					if (typeof obj !== 'object') return JSON.stringify(obj);
+					// error doesnt stringify correctly, manually include key fields like being an error
+					if (obj instanceof Error) return `{"t":"e","v":{"name":${JSON.stringify(obj.name)},"message":${JSON.stringify(obj.message)},"stack":${JSON.stringify(obj.stack)},"cause":${JSON.stringify(obj.cause)}}}`;
+					if (obj === null) return 'null';
+					processed ??= [];
+					processed.push([path, obj]);
+					const isArray = obj instanceof Array;
+					let str = '';
+					for (const name in obj) {
+						str += ',';
+						if (!isArray) str += `${JSON.stringify(name)}:`;
+						const first = processed.find(ent => ent[1] === obj[name]);
+						if (first) {
+							str += `{"t":"c","v":${JSON.stringify(first[0])}}`;
+							continue;
+						}
+						str += stringify(obj[name], processed, `${path}/${name}`);
+					}
+					return (isArray ? '{"t":"a","v":[' : '{"t":"o","v":{') + str.slice(1) + (isArray ? ']}' : '}}');
+				} catch (err) {
+					console.warn('Failed to process with error', err);
+					return JSON.stringify(obj);
+				}
+			};
+			/**
+			 * Parses the output of stringify recursively
+			 * @param {any} obj The object to process
+			 * @param {object<string,any>} processed What objects have been processed
+			 * @param {string} path The path to this object
+			 * @returns {any} The parsed result
+			 */
+			const _parseRecursive = (obj, processed, path) => {
+				if (typeof obj !== 'object') return obj;
+				if (obj === null) return null;
+				if (obj.t === 'c') return processed[obj.v];
+				// build up an error object
+				if (obj.t === 'e') {
+					const err = new Error('__TEMPLATE__');
+					if (obj.v.cause) err.cause = obj.v.cause;
+					if (obj.v.message) err.message = obj.v.message;
+					// @todo different browsers use different trace shapes, and so
+					// we need to use something like the log capture serialization here instead
+					if (obj.v.stack) err.stack = obj.v.stack;
+					if (obj.v.name) err.name = obj.v.name;
+					return err;
+				}
+				const result = obj.t === 'a' ? [] : {};
+				processed[path] = result;
+				for (const name in obj.v)
+					result[name] = _parseRecursive(obj.v[name], processed, `${path}/${name}`);
+				return result;
+			};
+			/**
+			 * Parses the stringified results from stringify
+			 * @param {string} string 
+			 * @returns {any}
+			 */
+			const parse = string => {
+				const json = JSON.parse(string);
+				if (!json.v) return json;
+				return _parseRecursive(json, {}, '');
+			};
+
+			class ObjectViewer extends HTMLElement {
+				static observedAttributes = ['key', 'object'];
+				/** @type {[string,any]} */
+				entries = [];
+				constructor() {
+					super();
+					this.attachShadow({ mode: 'open' });
+					const proto = document.createElement('div');
+					proto.style.marginLeft = '6px';
+					const check = document.createElement('div');
+					check.setAttribute('id', 'check');
+					check.style.transform = 'rotate(45deg)';
+					check.style.border = '1px solid grey';
+					check.style.borderTop = 'none';
+					check.style.borderLeft = 'none';
+					check.style.marginRight = '3px';
+					check.style.display = 'inline-block';
+					check.style.width = '0.5rem';
+					check.style.height = '0.5rem';
+					proto.appendChild(check);
+					const key = document.createElement('span');
+					key.setAttribute('id', 'key');
+					proto.appendChild(key);
+					const label = document.createElement('span');
+					label.textContent = '{}';
+					label.setAttribute('id', 'text');
+					proto.appendChild(label);
+					this.shadowRoot.appendChild(proto);
+					const entries = document.createElement('div');
+					entries.hidden = true;
+					entries.style.marginLeft = '6px';
+					proto.onclick = e => {
+						e.preventDefault();
+						e.stopPropagation();
+						entries.hidden = !entries.hidden;
+						check.style.transform = entries.hidden
+							? 'rotate(45deg)'
+							: 'rotate(-135deg)';
+
+						const entriesBox = this.shadowRoot.getElementById('entries');
+						for (const [key, value] of this.entries) {
+							const item = new ObjectViewer();
+							item.key = key;
+							item.object = value;
+							entriesBox.appendChild(item);
+						}
+					}
+					entries.setAttribute('id', 'entries');
+					this.shadowRoot.appendChild(entries);
+				}
+				get object() { return Object.fromEntries(this.entries); }
+				set object(value) {
+					const text = this.shadowRoot.getElementById('text');
+					text.style.color = 'inherit';
+					const check = this.shadowRoot.getElementById('check');
+					if (typeof value !== 'object' || value === null) {
+						check.style.display = 'none';
+						text.textContent = JSON.stringify(value);
+						text.style.color = typeof value === 'string'
+							? '#A87'
+							: '#6799AE';
+						return;
+					}
+					check.style.display = 'inline-block';
+					const isArray = value instanceof Array;
+					this.entries = Object.entries(value);
+					if (this.entries.length >= 1)
+						text.textContent = isArray ? '[...]' : '{...}';
+				}
+				set key(value) {
+					const keyName = this.shadowRoot.getElementById('key');
+					keyName.textContent = value + ': ';
+				}
+				attributeChangedCallback(name, old, newValue) {
+					if (name !== 'object' && name !== 'key') return;
+					if (name === 'key') return this.key = newValue;
+					this.object = parse(newValue);
+				}
+			}
+			window.customElements.define('object-viewer', ObjectViewer);
+			const body = document.getElementById("PAGE_BODY");
+			const isEmbed = location.pathname.replace(/\//gmi, "").startsWith("embed");
+
+			const checkAndApplyLauncher = () => {
+				// check for launcher params
+				const urlParams = new URLSearchParams(location.search);
+				const isLauncher = String(urlParams.get('using_launcher')) === 'true';
+				window._isPenguinModLauncher = false;
+				if (isLauncher) {
+					body.classList.add("launcher-mode");
+					window._isPenguinModLauncher = true;
+				}
+			};
+			const checkAndApplyAprilFools = () => {
+				// check local date or test params
+				const date = new Date(Date.now());
+				const urlParams = new URLSearchParams(location.search);
+				const isAprilFools = date.getMonth() === 3 && date.getDate() === 1; // month is 0 indexed for literally no reason
+				const runningLocal = String(urlParams.get('forceaprilfools')) === 'true' && location.hostname === 'localhost';
+				window._isAprilFools = isAprilFools || runningLocal;
+				if (isAprilFools || runningLocal) {
+					body.classList.add("april-fools");
+				}
+			};
+
+			let prefersDarkMode = false;
+			try {
+				prefersDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+			} catch {
+				prefersDarkMode = false;
+			}
+			const getDarkModeSetting = () => {
+				const savedDarkMode = localStorage.getItem('darkmode');
+				if (savedDarkMode !== null && savedDarkMode !== undefined) {
+					return String(savedDarkMode) === "true";
+				}
+				return prefersDarkMode;
+			};
+
+			const loop = () => {
+				const darkmode = isEmbed ?
+					location.hash.replace(/#/gmi, "") === "dark=true"
+					: getDarkModeSetting();
+				if (darkmode) {
+					body.classList.add("dark-mode");
+					body.style.background = "#111";
+					return;
+				}
+				body.classList.remove("dark-mode");
+				body.style.background = "";
+			}
+			setInterval(loop, 100);
+			loop();
+			
+			if (!isEmbed) {
+				// checkAndApplyLauncher();
+				checkAndApplyAprilFools();
+			}
+			
+			// warning in case of people pasting random code here
+			console.log(
+				"%cSCAM ALERT! %cDo NOT paste things into here that other people sent you!",
+				"color:red;font-family:sans-serif;font-size:2rem;font-weight:900",
+				"color:white;font-family:sans-serif;font-size:1.75rem;font-weight:900;-webkit-text-stroke: .5px black"
+			);
+			console.log("If you don't know what this window does, EXIT NOW! People can use this to upload inappropriate projects under YOUR name, delete YOUR projects, and get YOU banned from PenguinMod!");
+		</script>
+		<div style="display: contents"> <div id="svelte-announcer" aria-live="assertive" aria-atomic="true" style="position: absolute; left: 0px; top: 0px; clip: rect(0px, 0px, 0px, 0px); clip-path: inset(50%); overflow: hidden; white-space: nowrap; width: 1px; height: 1px;"></div></div>
+	<script defer="defer" src="v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon="{&quot;version&quot;:&quot;2024.11.0&quot;,&quot;token&quot;:&quot;329f722c06034bc58b8b2eea66ca477e&quot;,&quot;r&quot;:1,&quot;server_timing&quot;:{&quot;name&quot;:{&quot;cfCacheStatus&quot;:true,&quot;cfEdge&quot;:true,&quot;cfExtPri&quot;:true,&quot;cfL4&quot;:true,&quot;cfOrigin&quot;:true,&quot;cfSpeedBrain&quot;:true},&quot;location_startswith&quot;:null}}" crossorigin="anonymous"></script>
+
+
+</body></html>

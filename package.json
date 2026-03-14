@@ -1,0 +1,18 @@
+{
+  "name": "penguinmod-desktop",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "repository": "https://github.com/PenguinMod/PenguinMod-Desktop",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "electron": "^40.8.0",
+    "electron-updater": "^6.8.3"
+  }
+}
