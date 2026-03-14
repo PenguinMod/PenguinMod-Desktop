@@ -4,9 +4,27 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
   },
   "repository": "https://github.com/PenguinMod/PenguinMod-Desktop",
+  "build": {
+    "appId": "com.penguinmod.desktop",
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "PenguinMod",
+        "repo": "PenguinMod-Desktop"
+      }
+    ]
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -14,5 +32,8 @@
   "dependencies": {
     "electron": "^40.8.0",
     "electron-updater": "^6.8.3"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.8.1"
   }
 }
