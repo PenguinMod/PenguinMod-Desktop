@@ -1,3 +1,3 @@
-# Penguinmod Launcher
+# Penguinmod Desktop
 ### Description
-Launcher for PenguinMod. Downloads the latest PM version and compiles it to be used outside of your web browser.
+PenguinMod Desktop is a desktop app version of https://penguinmod.com/ that works both online and offline.
