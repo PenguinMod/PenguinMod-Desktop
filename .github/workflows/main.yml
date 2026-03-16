@@ -85,10 +85,12 @@ jobs:
           bun run build
           cp -R build ../app
           cd ..
-          rm -f app/package.json
+          rm -f app/package.json app/node_modules
 
       - name: Install non development packages
         run: |
+         rm -rf node_modules
+         mkdir node_modules
          bun i --force --omit=dev
 
       - name: Copy non development node_modules to app/

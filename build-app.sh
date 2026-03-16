@@ -62,6 +62,8 @@ cp -R build ../app
 cd ..
 
 echo "=== Installing non development packages ==="
+rm -rf node_modules
+mkdir node_modules
 bun i --force --omit=dev
 
 echo "=== Copying non development packages to app/ ==="
