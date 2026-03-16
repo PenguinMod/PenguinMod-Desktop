@@ -73,5 +73,8 @@
   "devDependencies": {
     "electron": "latest",
     "electron-builder": "latest"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0"
   }
 }

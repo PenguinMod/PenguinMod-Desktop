@@ -5,6 +5,8 @@ on:
   push:
   schedule:
     - cron: '0 6 * * *'
+env:
+  NODE_ENV: 'production'
 
 jobs:
   build:
@@ -85,6 +87,13 @@ jobs:
           cd ..
           rm -f app/package.json
 
+      - name: Install non development packages
+        run: |
+         bun i --force --omit=dev
+
+      - name: Copy non development node_modules to app/
+        run: |
+          cp -R node_modules app/ 
       # Build desktop app
       - name: Build Electron App
         run: npx electron-builder --linux AppImage deb rpm --win nsis --publish never

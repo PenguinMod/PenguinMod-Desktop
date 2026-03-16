@@ -61,6 +61,12 @@ NODE_ENV="production" bun run --silent build
 cp -R build ../app
 cd ..
 
+echo "=== Installing non development packages ==="
+bun i --force --omit=dev
+
+echo "=== Copying non development packages to app/ ==="
+cp -R node_modules app/
+
 #echo "=== Packaging all platforms with electron-builder ==="
 #bun exec electron-builder --config electron-builder.json
 
