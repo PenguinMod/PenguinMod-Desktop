@@ -11,7 +11,8 @@ protocol.registerSchemesAsPrivileged([
 
 // Set the App identity for Windows taskbar support
 app.name = "PenguinMod Desktop";
-app.setAppUserModelId("com.penguinmod.desktop");
+// Using the productName for AppUserModelId helps Windows associate the icon correctly
+app.setAppUserModelId("PenguinMod Desktop");
 
 let mainWindow = null;
 let pendingDeepLink = null;
@@ -129,20 +130,21 @@ function createWindow() {
         return createCorsResponse(net.fetch(proxyUrl));
     });
 
-    const iconPath = path.resolve(__dirname, 'logo.png');
+    const iconPath = path.resolve(__dirname, 'logo.ico');
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
-        icon: nativeImage.createFromPath(iconPath),
+        icon: iconPath,
+        title: "PenguinMod Desktop",
         webPreferences: {
             contextIsolation: false,
             nodeIntegration: false
         }
     });
 
-    // Explicitly set the icon again for the window using nativeImage
+    // Explicitly set the icon again for the window
     if (fs.existsSync(iconPath)) {
-        win.setIcon(nativeImage.createFromPath(iconPath));
+        win.setIcon(iconPath);
     }
 
     mainWindow = win;
@@ -190,11 +192,6 @@ function createWindow() {
         } else {
             // Keep or restore default menu for browsing
             const template = [
-                { role: 'appMenu' },
-                { role: 'fileMenu' },
-                { role: 'editMenu' },
-                { role: 'viewMenu' },
-                { role: 'windowMenu' },
                 {
                     label: 'Home',
                     click: () => win.loadURL("pm://localhost/index.html")

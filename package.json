@@ -1,7 +1,8 @@
 {
   "name": "penguinmod-desktop",
-  "version": "1.0.0",
-  "description": "",
+  "productName": "PenguinMod Desktop",
+  "version": "0.0.1",
+  "description": "PenguinMod Desktop client for Windows.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -12,6 +13,7 @@
   "build": {
     "appId": "com.penguinmod.desktop",
     "win": {
+      "icon": "logo.ico",
       "target": [
         "nsis",
         "portable"
@@ -26,14 +28,15 @@
     ]
   },
   "keywords": [],
-  "author": "",
+  "author": "Catpack6",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "electron": "^40.8.0",
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
-    "electron-builder": "^26.8.1"
+    "7zip-bin-win": "^2.2.0",
+    "electron": "^40.8.0",
+    "electron-builder": "^23.6.0"
   }
 }
