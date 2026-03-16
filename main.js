@@ -130,7 +130,7 @@ function createWindow() {
         return createCorsResponse(net.fetch(proxyUrl));
     });
 
-    const iconPath = path.resolve(__dirname, 'logo.ico');
+    const iconPath = path.resolve(__dirname, 'logo.png');
     const win = new BrowserWindow({
         width: 1200,
         height: 800,

@@ -1,7 +1,7 @@
 {
   "name": "penguinmod-desktop",
   "productName": "PenguinMod Desktop",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "PenguinMod Desktop client for Windows.",
   "main": "main.js",
   "scripts": {
@@ -13,7 +13,7 @@
   "build": {
     "appId": "com.penguinmod.desktop",
     "win": {
-      "icon": "logo.ico",
+      "icon": "logo.png",
       "target": [
         "nsis",
         "portable"
