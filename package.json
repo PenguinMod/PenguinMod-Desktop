@@ -13,7 +13,7 @@
   "build": {
     "appId": "com.penguinmod.desktop",
     "win": {
-      "icon": "logo.ico",
+      "icon": "logo.png",
       "target": [
         "nsis",
         "portable"
