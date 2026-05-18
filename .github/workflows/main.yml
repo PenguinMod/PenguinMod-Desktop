@@ -26,6 +26,21 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y wine32 wine64
+
+      - name: Clone PenguinMod Extension Gallery
+        run: |
+          git clone --depth=1 https://github.com/PenguinMod/PenguinMod-ExtensionsGallery.git
+
+      - name: Clone TurboWarp Extension Gallery
+        run: |
+          git clone --depth=1 https://github.com/TurboWarp/extensions.git TurboWarp-ExtensionsGallery
+          cd TurboWarp-ExtensionsGallery
+          bun i --force
+          bun run build
+      - name: Clone SharkPool Extension Gallery
+        run: |
+          git clone --depth=1 https://github.com/SharkPool-SP/SharkPools-Extensions.git
+
       - name: Clone PenguinMod home
         run: |
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Home.git
@@ -80,7 +95,7 @@ jobs:
           rm -rf node_modules/scratch-paint
           mv PenguinMod-Paint node_modules/scratch-paint
 
-  
+
       - name: Install deps
         run: bun i --force
 
@@ -96,6 +111,8 @@ jobs:
           bun run build
           cp -R public ../app
           cd ..
+          cp -R PenguinMod-ExtensionsGallery SharkPools-Extensions app/
+          cp -R TurboWarp-ExtensionsGallery/build app/TurboWarp-ExtensionsGallery
 
       - name: Install non development packages
         run: |
@@ -105,7 +122,7 @@ jobs:
 
       #- name: Copy non development node_modules to app/
         #run: |
-          #cp -R node_modules app/ 
+          #cp -R node_modules app/
       # Build desktop app
       - name: Build Electron App
         run: npx electron-builder --linux AppImage deb rpm --win nsis --publish never
@@ -113,10 +130,10 @@ jobs:
       # --- Zip unpacked folders first ---
       - name: Zip linux-unpacked
         run: zip -r builds/linux-unpacked.zip builds/linux-unpacked
-      
+
       - name: Zip win-unpacked
         run: zip -r builds/win-unpacked.zip builds/win-unpacked
-      
+
       # --- Upload Linux .deb ---
       - name: Upload Linux .deb
         run: echo "ARTIFACT_NAME=$(basename builds/*.deb)" >> $GITHUB_ENV
@@ -126,7 +143,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/*.deb
           archive: false
-      
+
       # --- Upload Linux .rpm ---
       - name: Upload Linux .rpm
         run: echo "ARTIFACT_NAME=$(basename builds/*.rpm)" >> $GITHUB_ENV
@@ -136,7 +153,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/*.rpm
           archive: false
-      
+
       # --- Upload Linux AppImage ---
       - name: Upload Linux AppImage
         run: echo "ARTIFACT_NAME=$(basename builds/*.AppImage)" >> $GITHUB_ENV
@@ -146,7 +163,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/*.AppImage
           archive: false
-      
+
       # --- Upload linux-unpacked zip ---
       - name: Upload linux-unpacked
         run: echo "ARTIFACT_NAME=$(basename builds/linux-unpacked.zip)" >> $GITHUB_ENV
@@ -156,7 +173,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/linux-unpacked.zip
           archive: false
-      
+
       # --- Upload win-unpacked zip ---
       - name: Upload win-unpacked
         run: echo "ARTIFACT_NAME=$(basename builds/win-unpacked.zip)" >> $GITHUB_ENV
@@ -166,7 +183,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: builds/win-unpacked.zip
           archive: false
-      
+
       # --- Upload Windows installer .exe ---
       - name: Upload Windows installer
         run: echo "ARTIFACT_NAME=$(basename builds/*.exe)" >> $GITHUB_ENV
