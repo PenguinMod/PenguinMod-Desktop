@@ -19,6 +19,11 @@ jobs:
       - name: Install Bun
         uses: oven-sh/setup-bun@v1
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -37,6 +42,7 @@ jobs:
           cd TurboWarp-ExtensionsGallery
           bun i --force
           bun run build
+
       - name: Clone SharkPool Extension Gallery
         run: |
           git clone --depth=1 https://github.com/SharkPool-SP/SharkPools-Extensions.git
