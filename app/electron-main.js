@@ -9,51 +9,91 @@ let isQuitting = false;
 // path to preload script (make sure this file exists)
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
-// Register app:// protocol
+// Privileged schemes
 protocol.registerSchemesAsPrivileged([
-  {
-    scheme: 'app',
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      allowServiceWorkers: true,
-      corsEnabled: true,
-      stream: true
-    }
-  }
+  { scheme: 'home', privileges: { standard: true, secure: true, supportFetchAPI: true, allowServiceWorkers: true, corsEnabled: true, stream: true } },
+  { scheme: 'editor', privileges: { standard: true, secure: true, supportFetchAPI: true, allowServiceWorkers: true, corsEnabled: true, stream: true } }
 ]);
 
-app.whenReady().then(() => {
-  protocol.handle('app', async (request) => {
+/**
+ * Registers a protocol that serves files from a local folder
+ * Works for both window navigation and fetch requests
+ */
+function registerStaticProtocol(scheme, rootDir) {
+  protocol.handle(scheme, (request) => {
     try {
       const url = new URL(request.url);
+      let pathname = decodeURIComponent(url.pathname).replace(/^\/+/, '');
 
-      // pathname can be "/" or "/index.html"
-      let pathname = decodeURIComponent(url.pathname);
-      if (pathname === '/' || pathname === '') {
-        pathname = '/index.html';
+      // Chromium promotes bare filenames to hostname in standard schemes
+      // e.g. build:///credits.html → build://credits.html/
+      if (!pathname) pathname = decodeURIComponent(url.hostname);
+
+      if (pathname.includes('..')) return new Response('Forbidden', { status: 403 });
+      if (!pathname) pathname = 'index.html';
+
+      let filePath = path.join(rootDir, pathname);
+
+      if (!fs.existsSync(filePath)) return new Response('Not found', { status: 404 });
+
+      if (fs.statSync(filePath).isDirectory()) {
+        filePath = path.join(filePath, 'index.html');
+        if (!fs.existsSync(filePath)) return new Response('Not found', { status: 404 });
       }
 
-      // strip leading slash
-      const relativePath = pathname.replace(/^\/+/, '');
-      const filePath = path.join(__dirname, relativePath);
-
-      if (!fs.existsSync(filePath)) {
-        console.error('[app://] file not found:', filePath);
-        return new Response('Not found', { status: 404 });
-      }
-
-      // net.fetch needs a valid file:// URL
-      const fileUrl = `file://${filePath}`;
+      const fileUrl = `file:///${filePath.replace(/\\/g, '/')}`;
       return net.fetch(fileUrl);
     } catch (err) {
-      console.error('[app://] handler error:', err);
-      return new Response('Protocol error', { status: 500 });
+      console.error(`[${scheme}] protocol handler error:`, err);
+      return new Response('Internal error', { status: 500 });
     }
   });
+}
+/**
+ * Adds a local offline handler for a domain or URL pattern.
+ * @param {RegExp} urlPattern - Regex to match URLs.
+ * @param {string} localFolder - Local folder where files are stored.
+ */
+function addLocalOfflineHandler(urlPattern, localFolder) {
+  protocol.interceptBufferProtocol('https', (request, callback) => {
+    if (urlPattern.test(request.url)) {
+      // Convert URL path to local file path
+      const urlPath = new URL(request.url).pathname; // /editor.html etc
+      const filePath = path.join(localFolder, decodeURIComponent(urlPath));
 
-  createWindow(process.argv[2] || 'index.html');
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          console.error('Failed to load local file:', filePath, err);
+          callback({ statusCode: 404 });
+          return;
+        }
+
+        // Guess MIME type based on extension
+        let mimeType = 'text/plain';
+        if (filePath.endsWith('.html')) mimeType = 'text/html';
+        else if (filePath.endsWith('.js')) mimeType = 'application/javascript';
+        else if (filePath.endsWith('.css')) mimeType = 'text/css';
+        else if (filePath.endsWith('.json')) mimeType = 'application/json';
+        else if (filePath.endsWith('.png')) mimeType = 'image/png';
+        else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) mimeType = 'image/jpeg';
+
+        callback({ mimeType, data });
+      });
+    } else {
+      // Pass through network requests for everything else
+      callback({ url: request.url });
+    }
+  });
+}
+
+
+app.whenReady().then(() => {
+  // Register both static protocols
+  registerStaticProtocol('home', path.join(__dirname, 'public'));
+  registerStaticProtocol('editor', path.join(__dirname, 'build'));
+
+  // Create main window
+  createWindow('home://index.html');
 });
 
 // Create main window
@@ -88,6 +128,12 @@ function createWindow(startFile) {
     if (level >= 2) console.error(prefix, message);
     else console.log(prefix, message);
   });
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    const url = mainWindow.webContents.getURL();
+    //console.log(url, url === "home://index.html/");
+    if (url === "home://index.html/") mainWindow.webContents.executeJavaScript(`for (const a of document.querySelectorAll('a[href="https://studio.penguinmod.com/editor.html"]')) { a.href = "editor://editor.html"; a.target = "_self"; }`)
+  })
 
   //
   // ROUTE JS DIALOGS: ipc handlers for alert/confirm/prompt
@@ -351,7 +397,7 @@ function createWindow(startFile) {
         setTimeout(() => {
           if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.getURL() === '') {
             console.log('[main] reload did not recover — recreating window');
-            createWindow(process.argv[2] || 'index.html');
+            createWindow('index.html');
           }
         }, 1000);
       } else {
@@ -390,7 +436,7 @@ function createWindow(startFile) {
       if (mainWindow && !mainWindow.isDestroyed()) {
         console.warn('[main] still unresponsive — destroying and recreating window');
         try { mainWindow.destroy(); } catch (e) { console.error(e); }
-        createWindow(process.argv[2] || 'index.html');
+        createWindow("home://index.html");
       }
     }, 1500);
   });
@@ -401,9 +447,8 @@ function createWindow(startFile) {
   });
 
   // Load URL
-  const startUrl = `app:///${startFile}`;
-  console.log('[main] loading', startUrl);
-  mainWindow.loadURL(startUrl).catch(err => {
+  console.log('[main] loading', startFile);
+  mainWindow.loadURL(startFile).catch(err => {
     console.error('[main] loadURL failed:', err);
   });
 }
