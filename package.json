@@ -55,7 +55,6 @@
       ]
     },
     "win": {
-      "icon": "app/logo.ico",
       "target": [
         {
           "target": "nsis",
