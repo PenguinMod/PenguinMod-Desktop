@@ -224,14 +224,19 @@ jobs:
       # --- Capture artifact filenames ---
       - name: Capture artifact filenames
         run: |
-          echo "DEB_PATH=$(ls builds/*.deb | head -1)" >> $GITHUB_ENV
-          echo "DEB_NAME=$(basename $(ls builds/*.deb | head -1))" >> $GITHUB_ENV
-          echo "RPM_PATH=$(ls builds/*.rpm | head -1)" >> $GITHUB_ENV
-          echo "RPM_NAME=$(basename $(ls builds/*.rpm | head -1))" >> $GITHUB_ENV
-          echo "APPIMAGE_PATH=$(ls builds/*.AppImage | head -1)" >> $GITHUB_ENV
-          echo "APPIMAGE_NAME=$(basename $(ls builds/*.AppImage | head -1))" >> $GITHUB_ENV
-          echo "EXE_PATH=$(ls builds/*.exe | head -1)" >> $GITHUB_ENV
-          echo "EXE_NAME=$(basename $(ls builds/*.exe | head -1))" >> $GITHUB_ENV
+          DEB=$(ls builds/*.deb | head -1)
+          RPM=$(ls builds/*.rpm | head -1)
+          APPIMAGE=$(ls builds/*.AppImage | head -1)
+          EXE=$(ls builds/*.exe | head -1)
+
+          echo "DEB_PATH=$DEB" >> $GITHUB_ENV
+          echo "DEB_NAME=$(basename "$DEB")" >> $GITHUB_ENV
+          echo "RPM_PATH=$RPM" >> $GITHUB_ENV
+          echo "RPM_NAME=$(basename "$RPM")" >> $GITHUB_ENV
+          echo "APPIMAGE_PATH=$APPIMAGE" >> $GITHUB_ENV
+          echo "APPIMAGE_NAME=$(basename "$APPIMAGE")" >> $GITHUB_ENV
+          echo "EXE_PATH=$EXE" >> $GITHUB_ENV
+          echo "EXE_NAME=$(basename "$EXE")" >> $GITHUB_ENV
 
       - name: Upload .deb release asset
         uses: actions/upload-release-asset@v1

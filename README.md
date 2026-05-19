@@ -1,23 +1,13 @@
-# THIS IS A FORK OF [Desk-Penguin](https://github.com/TheShovel/Desk-Penguin/)
+# PenguinMod Desktop
+A native [PenguinMod](https://penguinmod.com) desktop app for Linux and Windows that has good offline usage support.
 
-# Desk-Penguin
- [PenguinMod](https://penguinmod.com) native offline desktop app for Linux and Windows, now supporting NodeJs!
-# Dependencies
-- unzip
-- zip
-- bun
-- git
-- curl
+### This app contains the following offline:
+  - [PenguinMod Editor](https://github.com/PenguinMod/penguinmod.github.io)
+  - [PenguinMod Home Page](https://github.com/PenguinMod/PenguinMod-Home) (even though most of it won't work without wifi)
+  - [PenguinMod Extra Extensions Gallery](https://github.com/PenguinMod/PenguinMod-ExtensionsGallery)
+  - [TurboWarp Extensions Gallery](https://github.com/TurboWarp/extensions)
+  - [SharkPool's Extensions Gallery](https://github.com/SharkPool-SP/SharkPools-Extensions)
 
-This can only be built on Linux. If you want to do this on Windows, you will have to use something
-like WSL (Windows Subsystem for Linux).<br><br>
-MacOS is not supported as I can't test the packages on that!! (certified Apple moment)
+Yes, this app contains the three common extension galleries offline, as long as you use extensions from these three galleries that don't rely on stuff like network requests for functionality, it will load.
 
-# How to use
-Just open your terminal in the folder of the repository and run the script with
-```
-./build-app.sh
-```
-
-# Downloads
-Don't want to build this yourself? You can find pre-built executables here in the github releases(stable builds) or the github action runs artifacts(source builds, may or may not be stable)
+Based on [Desk Penguin](https://github.com/TheShovel/Desk-Penguin/) by [TheShovel](https://github.com/TheShovel) and [NodeJs Desk Penguin](https://github.com/FreshPenguin112/NodeJs-Desk-Penguin) by [FreshPenguin112](https://github.com/FreshPenguin112).
