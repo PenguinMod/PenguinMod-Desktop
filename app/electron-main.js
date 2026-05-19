@@ -2,6 +2,12 @@
 const { app, BrowserWindow, ipcMain, dialog, session, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const { createWriteStream } = require('fs');
+const { pipeline } = require('stream');
+const { promisify } = require('util');
+const unzipper = require('unzipper');
+const streamPipeline = promisify(pipeline);
 
 // 1. REGISTER PRIVILEGED SCHEMES (Must happen BEFORE app.whenReady)
 protocol.registerSchemesAsPrivileged([
@@ -79,15 +85,24 @@ function setupCustomProtocol(scheme, baseDir, defaultFile = 'index.html') {
       }
 
       let filePath = path.join(baseDir, combinedPath);
-      const ext = path.extname(combinedPath);
-      const isAsset = ext && ext !== '.html';
 
-      if (!fs.existsSync(filePath)) {
-        if (!isAsset) {
+      // SECURITY FIX: Prevent Directory Traversal Attacks
+      const relative = path.relative(baseDir, filePath);
+      const isSafe = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+
+      // FIX: If the file path isn't safe or doesn't exist on disk, fallback to index/editor.html
+      if (!isSafe || !fs.existsSync(filePath)) {
+        const ext = path.extname(combinedPath);
+        if (!ext || ext === '.html') {
           filePath = path.join(baseDir, defaultFile);
         } else {
           return new Response('Not Found', { status: 404 });
         }
+      }
+
+      // Ensure the fallback file actually exists before trying to read it
+      if (!fs.existsSync(filePath)) {
+        return new Response('Not Found', { status: 404 });
       }
 
       return net.fetch('file://' + filePath);
@@ -105,6 +120,126 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-startup-setting', () => getStartupSetting());
   ipcMain.on('set-startup-setting', (event, value) => setStartupSetting(value));
+
+  const GITHUB_REPO = 'FreshPenguin112/PenguinMod-Desktop-New';
+
+  ipcMain.handle('manual-check-update', async (event) => {
+    const senderFrame = event.senderFrame;
+
+    if (!senderFrame || senderFrame.parent !== null) {
+      throw new Error('Security Violation: Update calls must originate from the main frame context.');
+    }
+
+    const originUrl = senderFrame.url;
+    if (!originUrl.startsWith('home://') && !originUrl.startsWith('editor://')) {
+      throw new Error('Security Violation: Unauthorized origin attempt to invoke application updates.');
+    }
+
+    try {
+      // Fetch the latest release from the public Releases API (no token needed)
+      const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+      const res = await net.fetch(apiUrl, {
+        headers: { 'Accept': 'application/vnd.github+json' }
+      });
+
+      if (!res.ok) {
+        return { success: false, message: `GitHub API error: HTTP ${res.status}` };
+      }
+
+      const release = await res.json();
+
+      if (!release || !release.assets?.length) {
+        return { success: false, message: 'No release assets found.' };
+      }
+
+      const assetName = os.platform() === 'win32' ? 'win-unpacked.zip' : 'linux-unpacked.zip';
+      const asset = release.assets.find(a => a.name === assetName);
+
+      if (!asset) {
+        return { success: false, message: `No matching asset (${assetName}) found in latest release.` };
+      }
+
+      // Ask user if they want to install
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        buttons: ['Install Update', 'Cancel'],
+        defaultId: 0,
+          cancelId: 1,
+          title: 'Update Available',
+          message: `Update available: ${release.name || release.tag_name}`,
+          detail: [
+            `Release: ${release.name || release.tag_name}`,
+            `Published: ${new Date(release.published_at).toLocaleString()}`,
+                                               `Asset: ${asset.name} (${(asset.size / 1024 / 1024).toFixed(1)} MB)`,
+                                               release.body ? `\nNotes:\n${release.body.slice(0, 300)}${release.body.length > 300 ? '…' : ''}` : ''
+          ].join('\n'),
+                                               noLink: true
+      });
+
+      if (choice !== 0) {
+        return { success: false, message: 'Update cancelled.' };
+      }
+
+      // Show non-blocking progress notice
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        buttons: [],
+        title: 'Installing Update',
+        message: 'Downloading update, please wait…',
+        detail: 'The app will restart automatically when complete.',
+        noLink: true
+      });
+
+      // Download to temp dir
+      const tmpZip = path.join(os.tmpdir(), `penguinmod-update-${Date.now()}.zip`);
+      await downloadFile(asset.browser_download_url, tmpZip);
+
+      // Extract, only writing files that have changed
+      await extractChangedFiles(tmpZip, __dirname);
+
+      // Clean up
+      try { fs.unlinkSync(tmpZip); } catch {}
+
+      // Relaunch with updated files
+      app.relaunch();
+      app.exit(0);
+
+      return { success: true, message: 'Update installed. Restarting…' };
+    } catch (err) {
+      console.error('[manual-update]', err);
+      return { success: false, message: `Update failed: ${err.message}` };
+    }
+  });
+
+  async function downloadFile(url, destPath) {
+    const res = await net.fetch(url, {
+      headers: { 'Accept': 'application/octet-stream' }
+    });
+
+    if (!res.ok) {
+      throw new Error(`Download failed: HTTP ${res.status} from ${url}`);
+    }
+
+    const fileStream = createWriteStream(destPath);
+    await streamPipeline(res.body, fileStream);
+  }
+
+  async function extractChangedFiles(zipPath, targetDir) {
+    const directory = await unzipper.Open.file(zipPath);
+    for (const entry of directory.files) {
+      if (entry.type !== 'File') continue;
+      const targetPath = path.join(targetDir, entry.path);
+
+      const remoteData = await entry.buffer();
+      if (fs.existsSync(targetPath)) {
+        const localData = fs.readFileSync(targetPath);
+        if (Buffer.compare(localData, remoteData) === 0) continue;
+      } else {
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      }
+      fs.writeFileSync(targetPath, remoteData);
+    }
+  }
 
   protocol.handle('https', (request) => {
     const filePath = getLocalFile(request.url);
@@ -148,9 +283,9 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
       preload: PRELOAD_PATH,
-      webSecurity: false
+      webSecurity: true
     }
   });
 

@@ -1,7 +1,8 @@
-// preload.js
 const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
-// Helper for synchronous IPC communications
+// =========================================================================
+// 1. SECURE IPC DIALOG CHANNELS (Exposed only to the Preload isolation layer)
+// =========================================================================
 function sendSync(channel, payload) {
   try {
     return ipcRenderer.sendSync(channel, payload);
@@ -11,53 +12,61 @@ function sendSync(channel, payload) {
   }
 }
 
-// Expose secure hooks to the isolated Main World context
-contextBridge.exposeInMainWorld('__electronDialogBridge', {
+// Track callback safely inside the preload execution context
+const themeTracker = { callback: null };
+
+// =========================================================================
+// 2. EXPOSE EXPLICIT METHODS (Websites cannot alter these native functions)
+// =========================================================================
+contextBridge.exposeInMainWorld('__electronInternalBridge', {
   alert: (msg) => sendSync('electron-alert', String(msg ?? '')),
                                 confirm: (msg) => !!sendSync('electron-confirm', String(msg ?? '')),
-                                prompt: (message, defaultValue) => sendSync('electron-prompt-sync', { message, defaultValue })
+                                prompt: (msg, def) => sendSync('electron-prompt-sync', { message: msg, defaultValue: def }),
+
+                                // This notifies our preload script when the user changes themes on the website
+                                notifyThemeChanged: (isDark) => {
+                                  if (typeof themeTracker.callback === 'function') {
+                                    themeTracker.callback(isDark);
+                                  }
+                                }
 });
 
-// Overwrite the webpage's native alert/confirm/prompt globals
-webFrame.executeJavaScript(`
-(function installDialogOverrides() {
-  window.alert = (msg) => window.__electronDialogBridge.alert(msg);
-  window.confirm = (msg) => window.__electronDialogBridge.confirm(msg);
-  window.prompt = (message = '', defaultValue = '') => {
-    return window.__electronDialogBridge.prompt(message, defaultValue);
-  };
-})();
-`);
+contextBridge.exposeInMainWorld('__electronUpdaterBridge', {
+  checkForUpdate: () => ipcRenderer.invoke('manual-check-update')
+});
 
-// --- FLOATING SETTINGS BUTTON INJECTION ---
+// =========================================================================
+// 3. SECURE MAIN WORLD INJECTION (No raw strings or IPC exposure)
+// =========================================================================
 window.addEventListener('DOMContentLoaded', async () => {
-  // Helper to determine the theme state based on structural values passed out of Main World
-  function getThemeColors(isDark) {
-    return {
-      bg: isDark ? '#1e1e1e' : '#ffffff',
-      text: isDark ? '#f0f0f0' : '#333333',
-      border: isDark ? '#3d3d3d' : '#e5e5e5',
-      selectBg: isDark ? '#2d2d2d' : '#ffffff',
-      selectText: isDark ? '#ffffff' : '#333333',
-      selectBorder: isDark ? '#555555' : '#ccc',
-      hr: isDark ? '#2a2a2a' : '#eee'
+
+  // Cleanly override native dialogs without evaluating strings
+  webFrame.executeJavaScript(`
+  (() => {
+    window.alert = (msg) => window.__electronInternalBridge.alert(msg);
+    window.confirm = (msg) => window.__electronInternalBridge.confirm(msg);
+    window.prompt = (msg, def) => window.__electronInternalBridge.prompt(msg, def);
+
+    // Track theme mutations safely on the main window context
+    const dispatchTheme = () => {
+      const homeDark = localStorage.getItem('darkmode') === 'true';
+      const editorTheme = localStorage.getItem('tw:theme') === 'dark';
+      window.__electronInternalBridge.notifyThemeChanged(homeDark || editorTheme);
     };
-  }
 
-  // Extract initial condition safely from Main World
-  let initialDark = false;
-  try {
-    initialDark = await webFrame.executeJavaScript(`
-    (() => {
-      const homeDark = localStorage.getItem('darkmode');
-      const editorTheme = localStorage.getItem('tw:theme');
-      return (homeDark === 'true' || editorTheme === 'dark');
-    })()
-    `);
-  } catch (err) {
-    console.error('[preload] Initial theme lookup failed:', err);
-  }
+    // Set up listeners for storage changes
+    window.addEventListener('storage', dispatchTheme);
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+      originalSetItem.apply(this, arguments);
+      if (key === 'darkmode' || key === 'tw:theme') dispatchTheme();
+    };
+  })();
+  `);
 
+  // =========================================================================
+  // 4. FLOATING SETTINGS UI MANAGEMENT
+  // =========================================================================
   const currentSetting = await ipcRenderer.invoke('get-startup-setting');
 
   // Create UI Container
@@ -121,9 +130,28 @@ window.addEventListener('DOMContentLoaded', async () => {
   </div>
   `;
 
+  const updateBtn = document.createElement('button');
+  updateBtn.textContent = 'Check for Update';
+  updateBtn.style.cssText = `padding: 6px 12px; border-radius: 6px; border: none; background: #28a745; color: white; cursor: pointer;`;
+  panel.appendChild(updateBtn);
+
   container.appendChild(panel);
   container.appendChild(mainBtn);
   document.body.appendChild(container);
+
+  // Hook Up Update Execution (Preload layer handles IPC directly)
+  updateBtn.addEventListener('click', async () => {
+    updateBtn.disabled = true;
+    updateBtn.textContent = 'Checking...';
+    try {
+      const result = await ipcRenderer.invoke('manual-check-update');
+      sendSync('electron-alert', result.message);
+    } catch (err) {
+      console.error('[Update Error]', err);
+    }
+    updateBtn.textContent = 'Check for Update';
+    updateBtn.disabled = false;
+  });
 
   // Structural nodes referencing styling locations
   const titleNode = panel.querySelector('#settings-title-node');
@@ -131,120 +159,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   const labelNode = panel.querySelector('#settings-label-node');
   const selectNode = panel.querySelector('#startup-page-select');
 
-  // Unified function to handle rendering theme updates on demand
-  function applyTheme(isDark) {
-    const palette = getThemeColors(isDark);
-    panel.style.background = palette.bg;
-    panel.style.borderColor = palette.border;
-    panel.style.borderStyle = 'solid';
-    panel.style.borderWidth = '1px';
-
-    titleNode.style.color = palette.text;
-    labelNode.style.color = palette.text;
-    hrNode.style.borderTop = `1px solid ${palette.hr}`;
-
-    selectNode.style.background = palette.selectBg;
-    selectNode.style.color = palette.selectText;
-    selectNode.style.borderColor = palette.selectBorder;
-  }
-
-  // Apply default state computed above
-  applyTheme(initialDark);
   selectNode.value = currentSetting || 'home';
-
-  // --- REAL-TIME LIVE LOCALSTORAGE DETECTOR ---
-  // Expose an internal callback inside isolated context, then monitor the window object storage events
-  contextBridge.exposeInMainWorld('__electronThemeTrackerBridge', {
-    onThemeChanged: (isDark) => applyTheme(isDark)
-  });
-
-  webFrame.executeJavaScript(`
-  (() => {
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'darkmode' || e.key === 'tw:theme') {
-        const homeDark = localStorage.getItem('darkmode');
-        const editorTheme = localStorage.getItem('tw:theme');
-        const isDark = (homeDark === 'true' || editorTheme === 'dark');
-        if (window.__electronThemeTrackerBridge) {
-          window.__electronThemeTrackerBridge.onThemeChanged(isDark);
-        }
-      }
-    });
-
-    // Monkey patch setItem to track changes made programmatically within the same tab context
-    const originalSetItem = localStorage.setItem;
-    localStorage.setItem = function(key, value) {
-      originalSetItem.apply(this, arguments);
-      if (key === 'darkmode' || key === 'tw:theme') {
-        const homeDark = localStorage.getItem('darkmode');
-        const editorTheme = localStorage.getItem('tw:theme');
-        const isDark = (homeDark === 'true' || editorTheme === 'dark');
-        if (window.__electronThemeTrackerBridge) {
-          window.__electronThemeTrackerBridge.onThemeChanged(isDark);
-        }
-      }
-    };
-  })();
-  `);
-
-  // Setting modifications
   selectNode.addEventListener('change', (e) => {
     ipcRenderer.send('set-startup-setting', e.target.value);
   });
 
-  // Open settings interaction
-  mainBtn.addEventListener('click', (e) => {
-    if (isDragging) return;
-    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
-  });
+  themeTracker.callback = (isDark) => {
+    panel.style.background = isDark ? '#1e1e1e' : '#ffffff';
+    panel.style.color = isDark ? '#f0f0f0' : '#333333';
+  };
 
-  // Right-click to completely delete elements
-  mainBtn.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    container.remove();
+  mainBtn.addEventListener('click', () => {
+    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
   });
 
   panel.querySelector('#hide-settings-ui-btn').addEventListener('click', () => {
     container.style.display = 'none';
   });
-
-  // Draggable Mechanics
-  let isDragging = false;
-  let startX, startY, initialRight, initialBottom;
-
-  mainBtn.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return; // Left click only
-    isDragging = false;
-    startX = e.clientX;
-    startY = e.clientY;
-
-    const computed = window.getComputedStyle(container);
-    initialRight = parseInt(computed.right, 10);
-    initialBottom = parseInt(computed.bottom, 10);
-
-    mainBtn.style.cursor = 'grabbing';
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    e.preventDefault();
-  });
-
-  function onMouseMove(e) {
-    const deltaX = e.clientX - startX;
-    const deltaY = e.clientY - startY;
-
-    if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
-      isDragging = true;
-    }
-
-    if (isDragging) {
-      container.style.right = `${initialRight - deltaX}px`;
-      container.style.bottom = `${initialBottom - deltaY}px`;
-    }
-  }
-
-  function onMouseUp() {
-    mainBtn.style.cursor = 'grab';
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-  }
 });
