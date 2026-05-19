@@ -25,6 +25,7 @@
     "npmRebuild": false,
     "nodeGypRebuild": false,
     "linux": {
+      "compression": "normal",
       "category": "Development",
       "maintainer": "FreshPenguin112 <freshpenguin112@gmail.com>",
       "target": [
@@ -53,6 +54,12 @@
           ]
         }
       ]
+    },
+    "deb": {
+      "compression": "xz"
+    },
+    "rpm": {
+      "compression": "xz"
     },
     "win": {
       "target": [
