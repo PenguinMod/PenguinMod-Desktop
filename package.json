@@ -12,7 +12,6 @@
   "build": {
     "appId": "com.penguinmod.desktop",
     "productName": "PenguinMod Desktop",
-    "icon": "app/logo.ico",
     "directories": {
       "output": "builds"
     },
