@@ -1,7 +1,7 @@
+// electron-main.js
 const { app, BrowserWindow, ipcMain, dialog, session, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const mime = require('mime-types');
 
 // 1. REGISTER PRIVILEGED SCHEMES (Must happen BEFORE app.whenReady)
 protocol.registerSchemesAsPrivileged([
@@ -51,10 +51,10 @@ function setupCustomProtocol(scheme, baseDir, defaultFile = 'index.html') {
   protocol.handle(scheme, async (request) => {
     try {
       const url = new URL(request.url);
-      
+
       // Support both scheme://- and scheme:// filenames seamlessly
       let combinedPath = url.host && url.host !== '-' ? path.join(url.host, url.pathname) : url.pathname;
-      combinedPath = combinedPath.replace(/^\/+/, ''); 
+      combinedPath = combinedPath.replace(/^\/+/, '');
 
       // Default to root file if path is empty
       if (!combinedPath) {
@@ -135,7 +135,7 @@ function createWindow() {
     height: 800,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true,
+      contextIsolation: true, // Ensured protection tier activation
       sandbox: false,
       preload: PRELOAD_PATH,
       webSecurity: false
@@ -157,7 +157,7 @@ function createWindow() {
       mainWindow.webContents.executeJavaScript(`
         const observer = new MutationObserver(() => {
           for (const a of document.querySelectorAll('a[href="https://studio.penguinmod.com/editor.html"]')) {
-            a.href = "editor://-"; 
+            a.href = "editor://-";
             a.target = "_self";
           }
         });

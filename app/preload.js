@@ -1,21 +1,30 @@
 // preload.js
-const { ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
-(function installDialogOverrides() {
-  function sendSync(channel, payload) {
-    try {
-      return ipcRenderer.sendSync(channel, payload);
-    } catch (err) {
-      console.error('[preload] sync ipc failed', channel, err);
-      return null;
-    }
+// Helper for synchronous IPC communications
+function sendSync(channel, payload) {
+  try {
+    return ipcRenderer.sendSync(channel, payload);
+  } catch (err) {
+    console.error('[preload] sync ipc failed', channel, err);
+    return null;
   }
+}
 
-  window.alert = msg => sendSync('electron-alert', String(msg ?? ''));
-  window.confirm = msg => !!sendSync('electron-confirm', String(msg ?? ''));
+// Expose secure hooks to the isolated Main World context
+contextBridge.exposeInMainWorld('__electronDialogBridge', {
+  alert: (msg) => sendSync('electron-alert', String(msg ?? '')),
+  confirm: (msg) => !!sendSync('electron-confirm', String(msg ?? '')),
+  prompt: (message, defaultValue) => sendSync('electron-prompt-sync', { message, defaultValue })
+});
 
-  window.prompt = (message = '', defaultValue = '') => {
-    // synchronous IPC — main will block until prompt closes
-    return sendSync('electron-prompt-sync', { message, defaultValue });
-  };
-})();
+// Overwrite the webpage's native alert/confirm/prompt globals 
+webFrame.executeJavaScript(`
+  (function installDialogOverrides() {
+    window.alert = (msg) => window.__electronDialogBridge.alert(msg);
+    window.confirm = (msg) => window.__electronDialogBridge.confirm(msg);
+    window.prompt = (message = '', defaultValue = '') => {
+      return window.__electronDialogBridge.prompt(message, defaultValue);
+    };
+  })();
+`);
