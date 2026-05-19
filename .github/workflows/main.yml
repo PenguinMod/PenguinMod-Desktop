@@ -86,6 +86,7 @@ jobs:
           cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Render.git
           cd PenguinMod-Render
+          rm -f package-lock.json # hopefully fix this step taking like a minute for no reason
           bun i --force
           cd ..
           rm -rf node_modules/scratch-render
