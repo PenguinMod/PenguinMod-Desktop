@@ -86,5 +86,8 @@
   "devDependencies": {
     "electron": "latest",
     "electron-builder": "latest"
+  },
+  "dependencies": {
+    "unzipper": "^0.12.3"
   }
 }
