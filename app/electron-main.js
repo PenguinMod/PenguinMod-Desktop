@@ -9,8 +9,6 @@ const { promisify } = require('util');
 const unzipper = require('unzipper');
 const streamPipeline = promisify(pipeline);
 
-if (process.env.includes("DEBUG")) console.log("DEBUG hit");
-
 // 1. REGISTER PRIVILEGED SCHEMES (Must happen BEFORE app.whenReady)
 protocol.registerSchemesAsPrivileged([
   { scheme: 'home', privileges: { standard: true, secure: true, allowServiceWorkers: true, supportFetchAPI: true, corsEnabled: true } },
@@ -198,16 +196,16 @@ app.whenReady().then(() => {
         return { success: false, message: 'Update cancelled.' };
       }
       /*
-      // Show non-blocking progress notice
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        buttons: [],
-        title: 'Installing Update',
-        message: 'Downloading update, please wait…',
-        detail: 'The app will restart automatically when complete.',
-        noLink: true
-      });
-      */
+       *      // Show non-blocking progress notice
+       *      dialog.showMessageBox(mainWindow, {
+       *        type: 'info',
+       *        buttons: [],
+       *        title: 'Installing Update',
+       *        message: 'Downloading update, please wait…',
+       *        detail: 'The app will restart automatically when complete.',
+       *        noLink: true
+    });
+  */
 
       // Download to temp dir
       const tmpZip = path.join(os.tmpdir(), `penguinmod-update-${Date.now()}.zip`);
@@ -349,6 +347,23 @@ app.whenReady().then(() => {
       }
 
       safeWriteFile(targetPath, remoteData);
+
+      // On Linux, restore the Unix permissions stored in the zip.
+      // externalFileAttributes stores the mode in the upper 16 bits
+      // (same bits as st_mode). This handles executable binaries,
+      // shared libraries, and scripts without needing to know filenames.
+      if (os.platform() !== 'win32') {
+        const unixMode = (entry.externalFileAttributes >>> 16) & 0xFFFF;
+        if (unixMode !== 0) {
+          try {
+            fs.chmodSync(targetPath, unixMode);
+          } catch (chmodErr) {
+            console.warn('[update] chmod failed:', relativePath, chmodErr.code);
+          }
+        }
+      }
+
+      console.log('[update] wrote:', relativePath);
       console.log('[update] wrote:', relativePath);
     }
   }
