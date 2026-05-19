@@ -18,13 +18,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # --- Generate Dynamic Cache Key Components ---
+      - name: Get current week
+        run: echo "WEEK_STAMP=$(date +'%Y-%U')" >> $GITHUB_ENV
+
       # --- Cache APT packages ---
       - name: Cache APT packages
         uses: actions/cache@v3
         with:
           path: apt-cache
-          key: apt-cache-${{ runner.os }}-wine
+          key: apt-cache-${{ runner.os }}-wine-${{ env.WEEK_STAMP }}
           restore-keys: |
+            apt-cache-${{ runner.os }}-wine-
             apt-cache-${{ runner.os }}-
 
       # --- Install system dependencies ---
@@ -33,16 +38,15 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update
           
-          # 1. Create a local directory for the cached .deb files
           mkdir -p apt-cache
           
-          # 2. Download missing dependencies into the local folder instead of /var/cache/apt
+          # Download missing dependencies into local folder instead of /var/cache/apt
           sudo apt-get install -y -d -o dir::cache::archives="$(pwd)/apt-cache" git curl jq zip unzip wine32 wine64
           
-          # 3. Install the packages from your local cache folder
+          # Install the packages from local cache folder
           sudo dpkg -i apt-cache/*.deb || sudo apt-get install -f -y
           
-          # 4. Clean up any leftover root permissions so the runner can cache it safely
+          # Clean up root permissions so standard runner can cache it safely
           sudo chown -R runner:runner apt-cache
 
       # --- Install Bun ---
@@ -55,7 +59,7 @@ jobs:
         with:
           node-version: 26
 
-      # --- Clone repos and cache per-repo node_modules ---
+      # --- Clone Standalone Repos and Cache ---
 
       # PenguinMod Extension Gallery
       - name: Clone PenguinMod Extension Gallery
@@ -69,8 +73,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: TurboWarp-ExtensionsGallery/node_modules
-          key: node-modules-turbowarp
-          restore-keys: node-modules-turbowarp
+          key: node-modules-turbowarp-${{ env.WEEK_STAMP }}
+          restore-keys: |
+            node-modules-turbowarp-
 
       - name: Install TurboWarp deps
         run: |
@@ -90,8 +95,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: PenguinMod-Home/node_modules
-          key: node-modules-penguinmod-home
-          restore-keys: node-modules-penguinmod-home
+          key: node-modules-penguinmod-home-${{ env.WEEK_STAMP }}
+          restore-keys: |
+            node-modules-penguinmod-home-
 
       - name: Install PenguinMod Home deps
         run: |
@@ -99,106 +105,63 @@ jobs:
           mv .env.template .env
           bun i
 
-      # PenguinMod GUI
+      # --- Clone PenguinMod GUI Main Repository ---
       - name: Clone PenguinMod GUI
         run: git clone --depth=1 https://github.com/PenguinMod/penguinmod.github.io.git
 
-      - name: Cache GUI node_modules
+      # --- CONSOLIDATED GUI & SUBMODULES CACHE ---
+      - name: Cache GUI and Submodule node_modules
+        id: gui-cache
         uses: actions/cache@v3
         with:
-          path: penguinmod.github.io/node_modules
-          key: node-modules-penguinmod-gui
-          restore-keys: node-modules-penguinmod-gui
+          path: |
+            penguinmod.github.io/node_modules
+            penguinmod.github.io/PenguinMod-Vm/node_modules
+            penguinmod.github.io/PenguinMod-Blocks/node_modules
+            penguinmod.github.io/PenguinMod-Render/node_modules
+            penguinmod.github.io/PenguinMod-Paint/node_modules
+          key: node-modules-penguinmod-combined-${{ hashFiles('penguinmod.github.io/package.json') }}-${{ env.WEEK_STAMP }}
+          restore-keys: |
+            node-modules-penguinmod-combined-${{ hashFiles('penguinmod.github.io/package.json') }}-
+            node-modules-penguinmod-combined-
 
-      - name: Install GUI deps
+      # --- Process Submodules and Run Updates ---
+      - name: Setup GUI Dependencies & Submodules
         run: |
           cd penguinmod.github.io
-          bun i
-
-      # PenguinMod VM
-      - name: Clone PenguinMod VM
-        run: |
-          cd penguinmod.github.io
+          
+          # 1. Clone the absolute latest code for all submodules
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Vm.git
-
-      - name: Cache VM node_modules
-        uses: actions/cache@v3
-        with:
-          path: penguinmod.github.io/PenguinMod-Vm/node_modules
-          key: node-modules-penguinmod-vm
-          restore-keys: node-modules-penguinmod-vm
-
-      - name: Install VM deps
-        run: |
-          cd penguinmod.github.io/PenguinMod-Vm
-          bun i
-          cd ..
-          rm -rf node_modules/scratch-vm
-          mv PenguinMod-Vm node_modules/scratch-vm
-
-      # PenguinMod Blocks
-      - name: Clone PenguinMod Blocks
-        run: |
-          cd penguinmod.github.io
           git clone --depth=1 -b develop-builds https://github.com/PenguinMod/PenguinMod-Blocks.git
-
-      - name: Cache Blocks node_modules
-        uses: actions/cache@v3
-        with:
-          path: penguinmod.github.io/PenguinMod-Blocks/node_modules
-          key: node-modules-penguinmod-blocks
-          restore-keys: node-modules-penguinmod-blocks
-
-      - name: Install Blocks deps
-        run: |
-          cd penguinmod.github.io/PenguinMod-Blocks
-          bun i
-          cd ..
-          rm -rf node_modules/scratch-blocks
-          mv PenguinMod-Blocks node_modules/scratch-blocks
-
-      # PenguinMod Render
-      - name: Clone PenguinMod Render
-        run: |
-          cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Render.git
-
-      - name: Cache Render node_modules
-        uses: actions/cache@v3
-        with:
-          path: penguinmod.github.io/PenguinMod-Render/node_modules
-          key: node-modules-penguinmod-render
-          restore-keys: node-modules-penguinmod-render
-
-      - name: Install Render deps
-        run: |
-          cd penguinmod.github.io/PenguinMod-Render
-          rm -f package-lock.json
-          bun i
-          cd ..
-          rm -rf node_modules/scratch-render
-          mv PenguinMod-Render node_modules/scratch-render
-
-      # PenguinMod Paint
-      - name: Clone PenguinMod Paint
-        run: |
-          cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Paint.git
-
-      - name: Cache Paint node_modules
-        uses: actions/cache@v3
-        with:
-          path: penguinmod.github.io/PenguinMod-Paint/node_modules
-          key: node-modules-penguinmod-paint
-          restore-keys: node-modules-penguinmod-paint
-
-      - name: Install Paint deps
-        run: |
-          cd penguinmod.github.io/PenguinMod-Paint
+          
+          # 2. Rehydrate subfolder node_modules from the cache if they exist
+          if [ -d "node_modules/scratch-vm/node_modules" ]; then
+            mv node_modules/scratch-vm/node_modules PenguinMod-Vm/
+          fi
+          if [ -d "node_modules/scratch-blocks/node_modules" ]; then
+            mv node_modules/scratch-blocks/node_modules PenguinMod-Blocks/
+          fi
+          if [ -d "node_modules/scratch-render/node_modules" ]; then
+            mv node_modules/scratch-render/node_modules PenguinMod-Render/
+          fi
+          if [ -d "node_modules/scratch-paint/node_modules" ]; then
+            mv node_modules/scratch-paint/node_modules PenguinMod-Paint/
+          fi
+          
+          # 3. Trigger installations. Bun skips existing files instantly, fetching only upstream updates.
           bun i
-          cd ..
-          rm -rf node_modules/scratch-paint
-          mv PenguinMod-Paint node_modules/scratch-paint
+          cd PenguinMod-Vm && bun i && cd ..
+          cd PenguinMod-Blocks && bun i && cd ..
+          cd PenguinMod-Render && rm -f package-lock.json && bun i && cd ..
+          cd PenguinMod-Paint && bun i && cd ..
+          
+          # 4. Final nesting structure adjustment for compilation
+          rm -rf node_modules/scratch-vm && mv PenguinMod-Vm node_modules/scratch-vm
+          rm -rf node_modules/scratch-blocks && mv PenguinMod-Blocks node_modules/scratch-blocks
+          rm -rf node_modules/scratch-render && mv PenguinMod-Render node_modules/scratch-render
+          rm -rf node_modules/scratch-paint && mv PenguinMod-Paint node_modules/scratch-paint
 
       # --- Build Web App ---
       - name: Build PenguinMod Web
@@ -230,6 +193,7 @@ jobs:
       - name: Zip linux-unpacked
         run: zip -r builds/linux-unpacked.zip builds/linux-unpacked
 
+      # --- Zip win-unpacked ---
       - name: Zip win-unpacked
         run: zip -r builds/win-unpacked.zip builds/win-unpacked
 
