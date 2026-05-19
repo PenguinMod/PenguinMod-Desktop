@@ -13,6 +13,7 @@ let mainWindow = null;
 let isQuitting = false;
 
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
+const SETTINGS_FILE = path.join(app.getPath('userData'), 'app-settings.json');
 
 const folders = {
   home: path.join(__dirname, 'public'),
@@ -22,7 +23,27 @@ const folders = {
   sharkpools: path.join(__dirname, 'SharkPools-Extensions')
 };
 
-// Map URLs to local folders for offline serving
+function getStartupSetting() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      return data.startupPage || 'home';
+    }
+  } catch (err) {
+    console.error('[Settings] Failed to load configuration:', err);
+  }
+  return 'home';
+}
+
+function setStartupSetting(value) {
+  try {
+    const data = { startupPage: value };
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[Settings] Failed to save configuration:', err);
+  }
+}
+
 function getLocalFile(url) {
   const parsed = new URL(url);
 
@@ -46,17 +67,13 @@ function getLocalFile(url) {
   return null;
 }
 
-// Helper to natively handle custom protocol directory serving
 function setupCustomProtocol(scheme, baseDir, defaultFile = 'index.html') {
   protocol.handle(scheme, async (request) => {
     try {
       const url = new URL(request.url);
-
-      // Support both scheme://- and scheme:// filenames seamlessly
       let combinedPath = url.host && url.host !== '-' ? path.join(url.host, url.pathname) : url.pathname;
       combinedPath = combinedPath.replace(/^\/+/, '');
 
-      // Default to root file if path is empty
       if (!combinedPath) {
         combinedPath = defaultFile;
       }
@@ -65,7 +82,6 @@ function setupCustomProtocol(scheme, baseDir, defaultFile = 'index.html') {
       const ext = path.extname(combinedPath);
       const isAsset = ext && ext !== '.html';
 
-      // Smart SPA Routing: If a file doesn't exist, only fall back to HTML if it isn't a broken JS/CSS asset
       if (!fs.existsSync(filePath)) {
         if (!isAsset) {
           filePath = path.join(baseDir, defaultFile);
@@ -84,11 +100,12 @@ function setupCustomProtocol(scheme, baseDir, defaultFile = 'index.html') {
 
 // App ready
 app.whenReady().then(() => {
-  // Set up native custom protocols
   setupCustomProtocol('home', folders.home, 'index.html');
   setupCustomProtocol('editor', folders.editor, 'editor.html');
 
-  // Intercept https requests for offline/local overrides
+  ipcMain.handle('get-startup-setting', () => getStartupSetting());
+  ipcMain.on('set-startup-setting', (event, value) => setStartupSetting(value));
+
   protocol.handle('https', (request) => {
     const filePath = getLocalFile(request.url);
     if (filePath) {
@@ -97,7 +114,6 @@ app.whenReady().then(() => {
     return net.fetch(request, { bypassCustomProtocolHandlers: true });
   });
 
-  // Fix X-Frame-Options headers
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const headers = details.responseHeaders;
     delete headers['x-frame-options'];
@@ -105,10 +121,8 @@ app.whenReady().then(() => {
     callback({ responseHeaders: headers });
   });
 
-  // Modify headers for YouTube Embeds & Cookies
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     const { requestHeaders, url } = details;
-
     try {
       const parsedUrl = new URL(url);
       if (parsedUrl.host === "www.youtube.com" || parsedUrl.host === "www.youtube-nocookie.com") {
@@ -116,14 +130,12 @@ app.whenReady().then(() => {
         requestHeaders['Referer'] = 'https://penguinmod.com/';
       }
     } catch (_) {}
-
     callback({ requestHeaders });
   });
 
   createWindow();
 });
 
-// Create main window
 function createWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     try { mainWindow.destroy(); } catch {}
@@ -135,15 +147,19 @@ function createWindow() {
     height: 800,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true, // Ensured protection tier activation
+      contextIsolation: true,
       sandbox: false,
       preload: PRELOAD_PATH,
       webSecurity: false
     }
   });
 
-  // Load the home protocol directly
-  mainWindow.loadURL('home://-');
+  const startupTarget = getStartupSetting();
+  if (startupTarget === 'editor') {
+    mainWindow.loadURL('editor://-');
+  } else {
+    mainWindow.loadURL('home://-');
+  }
 
   mainWindow.webContents.on('console-message', (_, level, message, line, sourceId) => {
     const prefix = `[renderer:${sourceId}:${line}]`;
@@ -151,42 +167,56 @@ function createWindow() {
     else console.log(prefix, message);
   });
 
-  mainWindow.webContents.on("did-finish-load", () => {
-    const url = mainWindow.webContents.getURL();
-    if (url.startsWith("home://")) {
-      mainWindow.webContents.executeJavaScript(`
-        const observer = new MutationObserver(() => {
-          for (const a of document.querySelectorAll('a[href="https://studio.penguinmod.com/editor.html"]')) {
-            a.href = "editor://-";
-            a.target = "_self";
-          }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-        for (const a of document.querySelectorAll('a[href="https://studio.penguinmod.com/editor.html"]')) {
-          a.href = "editor://-";
-          a.target = "_self";
+    mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+      try {
+        const parsedUrl = new URL(navigationUrl);
+        if (parsedUrl.host === 'studio.penguinmod.com' && parsedUrl.pathname.includes('editor.html')) {
+          event.preventDefault();
+          mainWindow.loadURL('editor://-');
+          return;
         }
-      `);
-    }
-  });
+        if (parsedUrl.host === 'penguinmod.com' && (parsedUrl.pathname === '/' || parsedUrl.pathname === '/index.html')) {
+          event.preventDefault();
+          mainWindow.loadURL('home://-');
+          return;
+        }
+      } catch (e) {
+        console.error('[navigation-interceptor] Error:', e);
+      }
+    });
 
-  setupDialogs();
+    mainWindow.webContents.setWindowOpenHandler((details) => {
+      try {
+        const parsedUrl = new URL(details.url);
+        if (parsedUrl.host === 'studio.penguinmod.com' && parsedUrl.pathname.includes('editor.html')) {
+          mainWindow.loadURL('editor://-');
+          return { action: 'deny' };
+        }
+        if (parsedUrl.host === 'penguinmod.com' && (parsedUrl.pathname === '/' || parsedUrl.pathname === '/index.html')) {
+          mainWindow.loadURL('home://-');
+          return { action: 'deny' };
+        }
+      } catch (e) {
+        console.error('[window-open-interceptor] Error:', e);
+      }
+      return { action: 'allow' };
+    });
 
-  mainWindow.on('closed', () => mainWindow = null);
+    setupDialogs();
 
-  mainWindow.webContents.on('render-process-gone', () => createWindow());
-  mainWindow.webContents.on('crashed', () => createWindow());
-  mainWindow.on('unresponsive', () => {
-    try { mainWindow.webContents.reloadIgnoringCache(); } catch {}
-    setTimeout(() => {
-      if (!mainWindow.isDestroyed()) return;
-      try { mainWindow.destroy(); } catch {}
-      createWindow();
-    }, 1500);
-  });
+    mainWindow.on('closed', () => mainWindow = null);
+    mainWindow.webContents.on('render-process-gone', () => createWindow());
+    mainWindow.webContents.on('crashed', () => createWindow());
+    mainWindow.on('unresponsive', () => {
+      try { mainWindow.webContents.reloadIgnoringCache(); } catch {}
+      setTimeout(() => {
+        if (!mainWindow.isDestroyed()) return;
+        try { mainWindow.destroy(); } catch {}
+        createWindow();
+      }, 1500);
+    });
 }
 
-// IPC reload
 ipcMain.on('renderer-request-reload', () => {
   if (isQuitting) return;
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -198,7 +228,18 @@ app.on('before-quit', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
 });
 
-app.on('window-all-closed', () => app.quit());
+// Reactivate window if app icon is clicked in dock/taskbar when windows are hidden
+app.on('activate', () => {
+  if (mainWindow) {
+    mainWindow.show();
+  } else {
+    createWindow();
+  }
+});
+
+app.on('window-all-closed', () => {
+  app.quit();
+});
 
 process.on('uncaughtException', err => console.error('[main] uncaughtException:', err));
 process.on('unhandledRejection', reason => console.error('[main] unhandledRejection:', reason));
@@ -210,9 +251,9 @@ function setupDialogs() {
         type: opts.type || 'info',
         buttons: ['OK'],
         defaultId: 0,
-        message: String(message ?? ''),
-        detail: opts.detail || undefined,
-        noLink: true
+          message: String(message ?? ''),
+                                detail: opts.detail || undefined,
+                                noLink: true
       });
     } catch (e) {
       console.error('[main] electron-alert dialog failed', e);
@@ -226,10 +267,10 @@ function setupDialogs() {
         type: opts.type || 'question',
         buttons: opts.buttons || ['OK', 'Cancel'],
         defaultId: (opts.defaultId === 1) ? 1 : 0,
-        cancelId: (opts.cancelId === 1) ? 1 : 1,
-        message: String(message ?? ''),
-        detail: opts.detail || undefined,
-        noLink: true
+          cancelId: (opts.cancelId === 1) ? 1 : 1,
+                                               message: String(message ?? ''),
+                                               detail: opts.detail || undefined,
+                                               noLink: true
       });
       event.returnValue = (choice === 0);
     } catch (e) {
@@ -257,7 +298,7 @@ function setupDialogs() {
     });
 
     const escapeHtml = s => String(s ?? '').replace(/[&<>"'`]/g, c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c])
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c])
     );
 
     const html = `

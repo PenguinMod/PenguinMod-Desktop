@@ -1,7 +1,7 @@
 {
-  "name": "nodejs-penguinmod-desktop",
+  "name": "penguinmod-desktop",
   "author": "FreshPenguin112 <freshpenguin112@gmail.com>",
-  "description": "A fork of TheShovel's Desk-Penguin that supports Node.js",
+  "description": "A desktop version of the PenguinMod home page and editor",
   "version": "1.0.0",
   "main": "app/electron-main.js",
   "scripts": {
@@ -10,8 +10,9 @@
     "build:fast": "electron-builder --config.compression=store --publish never --dir"
   },
   "build": {
-    "appId": "com.freshpenguin112.nodejs-desk-penguin",
-    "productName": "NodeJS Desk Penguin",
+    "appId": "com.penguinmod.desktop",
+    "productName": "PenguinMod Desktop",
+    "icon": "app/logo.ico",
     "directories": {
       "output": "builds"
     },
@@ -26,7 +27,6 @@
     "nodeGypRebuild": false,
     "linux": {
       "category": "Development",
-      "icon": "app/icon.png",
       "maintainer": "FreshPenguin112 <freshpenguin112@gmail.com>",
       "target": [
         {
@@ -56,6 +56,7 @@
       ]
     },
     "win": {
+      "icon": "app/logo.ico",
       "target": [
         {
           "target": "nsis",
@@ -66,8 +67,15 @@
           ]
         }
       ],
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
       "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PenguinMod Desktop"
     }
   },
   "devDependencies": {
