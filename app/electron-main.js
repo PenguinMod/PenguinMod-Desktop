@@ -1,7 +1,8 @@
 // electron-main.js
-const { app, BrowserWindow, ipcMain, protocol, net, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const mime = require('mime-types');
 
 let mainWindow = null;
 let isQuitting = false;
@@ -20,35 +21,33 @@ protocol.registerSchemesAsPrivileged([
  * Works for both window navigation and fetch requests
  */
 function registerStaticProtocol(scheme, rootDir) {
-  protocol.handle(scheme, (request) => {
+  protocol.registerBufferProtocol(scheme, (request, callback) => {
     try {
       const url = new URL(request.url);
       let pathname = decodeURIComponent(url.pathname).replace(/^\/+/, '');
-
-      // Chromium promotes bare filenames to hostname in standard schemes
-      // e.g. build:///credits.html → build://credits.html/
-      if (!pathname) pathname = decodeURIComponent(url.hostname);
-
-      if (pathname.includes('..')) return new Response('Forbidden', { status: 403 });
       if (!pathname) pathname = 'index.html';
 
+      if (pathname.includes('..')) return callback({ statusCode: 403, data: Buffer.from('Forbidden') });
+
       let filePath = path.join(rootDir, pathname);
-
-      if (!fs.existsSync(filePath)) return new Response('Not found', { status: 404 });
-
+      if (!fs.existsSync(filePath)) return callback({ statusCode: 404, data: Buffer.from('Not found') });
       if (fs.statSync(filePath).isDirectory()) {
         filePath = path.join(filePath, 'index.html');
-        if (!fs.existsSync(filePath)) return new Response('Not found', { status: 404 });
+        if (!fs.existsSync(filePath)) return callback({ statusCode: 404, data: Buffer.from('Not found') });
       }
 
-      const fileUrl = `file:///${filePath.replace(/\\/g, '/')}`;
-      return net.fetch(fileUrl);
+      const data = fs.readFileSync(filePath);
+
+      const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+
+      callback({ data, mimeType });
     } catch (err) {
-      console.error(`[${scheme}] protocol handler error:`, err);
-      return new Response('Internal error', { status: 500 });
+      console.error(`[${scheme}] protocol error:`, err);
+      callback({ statusCode: 500, data: Buffer.from('Internal error') });
     }
   });
 }
+
 /**
  * Adds a local offline handler for a domain or URL pattern.
  * @param {RegExp} urlPattern - Regex to match URLs.
@@ -56,42 +55,52 @@ function registerStaticProtocol(scheme, rootDir) {
  */
 function addLocalOfflineHandler(urlPattern, localFolder) {
   protocol.interceptBufferProtocol('https', (request, callback) => {
-    if (urlPattern.test(request.url)) {
-      // Convert URL path to local file path
-      const urlPath = new URL(request.url).pathname; // /editor.html etc
-      const filePath = path.join(localFolder, decodeURIComponent(urlPath));
+    const url = request.url;
 
-      fs.readFile(filePath, (err, data) => {
-        if (err) {
-          console.error('Failed to load local file:', filePath, err);
-          callback({ statusCode: 404 });
-          return;
-        }
-
-        // Guess MIME type based on extension
-        let mimeType = 'text/plain';
-        if (filePath.endsWith('.html')) mimeType = 'text/html';
-        else if (filePath.endsWith('.js')) mimeType = 'application/javascript';
-        else if (filePath.endsWith('.css')) mimeType = 'text/css';
-        else if (filePath.endsWith('.json')) mimeType = 'application/json';
-        else if (filePath.endsWith('.png')) mimeType = 'image/png';
-        else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) mimeType = 'image/jpeg';
-
-        callback({ mimeType, data });
-      });
+    let filePath;
+    if (/^https:\/\/extensions\.turbowarp\.org\/.*$/.test(url)) {
+      const urlPath = new URL(url).pathname.replace(/^\/+/, '');
+      filePath = path.join(__dirname, 'TurboWarp-ExtensionsGallery', urlPath);
+    } else if (/^https:\/\/extensions\.penguinmod\.com\/$/.test(url)) {
+      const urlPath = new URL(url).pathname.replace(/^\/+/, '');
+      filePath = path.join(__dirname, 'PenguinMod-ExtensionsGallery', urlPath);
+    } else if (/^https:\/\/(?:sharkpool-sp\.github\.io\/SharkPools-Extensions.*|sharkpools-extensions\.vercel\.app\/.*|raw\.githubusercontent\.com\/SharkPool-SP\/SharkPools-Extensions\/refs\/heads\/main\/.*)$/.test(url)) {
+      const urlPath = new URL(url).pathname.replace(/^\/+/, '');
+      filePath = path.join(__dirname, 'SharkPools-Extensions', urlPath);
     } else {
-      // Pass through network requests for everything else
-      callback({ url: request.url });
+      return callback({ url }); // pass through everything else
     }
+
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        console.error('Failed to load local file:', filePath, err);
+        return callback({ statusCode: 404, data: Buffer.from('Not found') });
+      }
+
+      let mimeType = 'text/plain';
+      if (filePath.endsWith('.html')) mimeType = 'text/html';
+      else if (filePath.endsWith('.js')) mimeType = 'application/javascript';
+      else if (filePath.endsWith('.css')) mimeType = 'text/css';
+      else if (filePath.endsWith('.json')) mimeType = 'application/json';
+      else if (filePath.endsWith('.png')) mimeType = 'image/png';
+      else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) mimeType = 'image/jpeg';
+
+      callback({ data, mimeType });
+    });
   });
 }
-
 
 app.whenReady().then(() => {
   // Register both static protocols
   registerStaticProtocol('home', path.join(__dirname, 'public'));
   registerStaticProtocol('editor', path.join(__dirname, 'build'));
-
+  addLocalOfflineHandler(/^https:\/\/extensions\.turbowarp\.org\/.*$/, path.join(__dirname, 'TurboWarp-ExtensionsGallery'));
+  addLocalOfflineHandler(/^https:\/\/extensions\.penguinmod\.com\/$/, path.join(__dirname, 'PenguinMod-ExtensionsGallery'));
+  addLocalOfflineHandler(/^https:\/\/(?:sharkpool-sp\.github\.io\/SharkPools-Extensions.*|sharkpools-extensions\.vercel\.app\/.*|raw\.githubusercontent\.com\/SharkPool-SP\/SharkPools-Extensions\/refs\/heads\/main\/.*)$/, path.join(__dirname, 'SharkPools-Extensions'))
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    // Allows sending cookies for iframe origins
+    callback({ requestHeaders: details.requestHeaders });
+  });
   // Create main window
   createWindow('home://index.html');
 });
@@ -114,8 +123,8 @@ function createWindow(startFile) {
     height: 800,
     webPreferences: {
       // keep your original compatibility flags
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
       sandbox: false,
       // ensure the preload we provide runs before page scripts
       preload: PRELOAD_PATH
@@ -448,7 +457,7 @@ function createWindow(startFile) {
 
   // Load URL
   console.log('[main] loading', startFile);
-  mainWindow.loadURL(startFile).catch(err => {
+  mainWindow.loadURL(startFile, {userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}).catch(err => {
     console.error('[main] loadURL failed:', err);
   });
 }
@@ -461,7 +470,7 @@ ipcMain.on('renderer-request-reload', () => {
   const wc = mainWindow.webContents;
   if (!wc || wc.isDestroyed()) {
     console.warn('[main] requested reload but webContents is destroyed — recreating window');
-    createWindow(process.argv[2] || 'index.html');
+    createWindow('home://index.html');
     return;
   }
 
@@ -470,7 +479,7 @@ ipcMain.on('renderer-request-reload', () => {
     wc.reloadIgnoringCache();
   } catch (e) {
     console.error('[main] reload failed:', e);
-    try { mainWindow.loadURL(`app:///${process.argv[2] || 'index.html'}`); } catch (e2) { console.error(e2); }
+    try { mainWindow.loadURL(`home://index.html`, {userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}); } catch (e2) { console.error(e2); }
   }
 });
 

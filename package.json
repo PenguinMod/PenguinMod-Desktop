@@ -75,6 +75,7 @@
     "electron-builder": "latest"
   },
   "dependencies": {
-    "node-pty": "^1.1.0"
+    "node-pty": "^1.1.0",
+    "mime-types": "^3.0.2"
   }
 }
