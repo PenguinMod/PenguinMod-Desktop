@@ -221,7 +221,58 @@ jobs:
           draft: false
           prerelease: true
 
-      # --- Upload Release Assets ---
+      # --- Capture artifact filenames ---
+      - name: Capture artifact filenames
+        run: |
+          echo "DEB_PATH=$(ls builds/*.deb | head -1)" >> $GITHUB_ENV
+          echo "DEB_NAME=$(basename $(ls builds/*.deb | head -1))" >> $GITHUB_ENV
+          echo "RPM_PATH=$(ls builds/*.rpm | head -1)" >> $GITHUB_ENV
+          echo "RPM_NAME=$(basename $(ls builds/*.rpm | head -1))" >> $GITHUB_ENV
+          echo "APPIMAGE_PATH=$(ls builds/*.AppImage | head -1)" >> $GITHUB_ENV
+          echo "APPIMAGE_NAME=$(basename $(ls builds/*.AppImage | head -1))" >> $GITHUB_ENV
+          echo "EXE_PATH=$(ls builds/*.exe | head -1)" >> $GITHUB_ENV
+          echo "EXE_NAME=$(basename $(ls builds/*.exe | head -1))" >> $GITHUB_ENV
+
+      - name: Upload .deb release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.DEB_PATH }}
+          asset_name: ${{ env.DEB_NAME }}
+          asset_content_type: application/vnd.debian.binary-package
+
+      - name: Upload .rpm release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.RPM_PATH }}
+          asset_name: ${{ env.RPM_NAME }}
+          asset_content_type: application/x-rpm
+
+      - name: Upload AppImage release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.APPIMAGE_PATH }}
+          asset_name: ${{ env.APPIMAGE_NAME }}
+          asset_content_type: application/octet-stream
+
+      - name: Upload .exe release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.EXE_PATH }}
+          asset_name: ${{ env.EXE_NAME }}
+          asset_content_type: application/octet-stream
+
       - name: Upload linux-unpacked.zip
         uses: actions/upload-release-asset@v1
         env:
@@ -241,51 +292,3 @@ jobs:
           asset_path: builds/win-unpacked.zip
           asset_name: win-unpacked.zip
           asset_content_type: application/zip
-
-      - name: Upload Linux .deb
-        run: echo "DEB_PATH=$(ls builds/*.deb | head -1)" >> $GITHUB_ENV
-      - name: Upload .deb release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.DEB_PATH }}
-          asset_name: penguinmod.deb
-          asset_content_type: application/vnd.debian.binary-package
-
-      - name: Upload Linux .rpm
-        run: echo "RPM_PATH=$(ls builds/*.rpm | head -1)" >> $GITHUB_ENV
-      - name: Upload .rpm release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.RPM_PATH }}
-          asset_name: penguinmod.rpm
-          asset_content_type: application/x-rpm
-
-      - name: Upload Linux AppImage
-        run: echo "APPIMAGE_PATH=$(ls builds/*.AppImage | head -1)" >> $GITHUB_ENV
-      - name: Upload AppImage release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.APPIMAGE_PATH }}
-          asset_name: penguinmod.AppImage
-          asset_content_type: application/octet-stream
-
-      - name: Upload Windows installer
-        run: echo "EXE_PATH=$(ls builds/*.exe | head -1)" >> $GITHUB_ENV
-      - name: Upload .exe release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.EXE_PATH }}
-          asset_name: penguinmod-setup.exe
-          asset_content_type: application/octet-stream

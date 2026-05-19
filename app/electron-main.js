@@ -137,7 +137,7 @@ app.whenReady().then(() => {
 
     try {
       // Fetch the latest release from the public Releases API (no token needed)
-      const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+      const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/releases`;
       const res = await net.fetch(apiUrl, {
         headers: { 'Accept': 'application/vnd.github+json' }
       });
@@ -146,7 +146,8 @@ app.whenReady().then(() => {
         return { success: false, message: `GitHub API error: HTTP ${res.status}` };
       }
 
-      const release = await res.json();
+      let releases = await res.json();
+      const release = releases[0];
 
       if (!release || !release.assets?.length) {
         return { success: false, message: 'No release assets found.' };
