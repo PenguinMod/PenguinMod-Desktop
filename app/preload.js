@@ -45,6 +45,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.alert = (msg) => window.__electronInternalBridge.alert(msg);
     window.confirm = (msg) => window.__electronInternalBridge.confirm(msg);
     window.prompt = (msg, def) => window.__electronInternalBridge.prompt(msg, def);
+    alert("update worked!!")
 
     // Track theme mutations safely on the main window context
     const dispatchTheme = () => {
