@@ -9,6 +9,8 @@ const { promisify } = require('util');
 const unzipper = require('unzipper');
 const streamPipeline = promisify(pipeline);
 
+if (process.env.includes("DEBUG")) console.log("DEBUG hit");
+
 // 1. REGISTER PRIVILEGED SCHEMES (Must happen BEFORE app.whenReady)
 protocol.registerSchemesAsPrivileged([
   { scheme: 'home', privileges: { standard: true, secure: true, allowServiceWorkers: true, supportFetchAPI: true, corsEnabled: true } },
@@ -277,6 +279,41 @@ app.whenReady().then(() => {
     });
   }
 
+  function safeWriteFile(targetPath, data) {
+    if (os.platform() === 'win32') {
+      // Windows: can't overwrite a running executable directly (EBUSY).
+      // Rename it out of the way first, write the new file, then delete the old one.
+      // If the rename itself fails we fall back to a direct write.
+      if (fs.existsSync(targetPath)) {
+        const tombstone = targetPath + '.old';
+        try {
+          // Remove a leftover tombstone from a previous failed update
+          if (fs.existsSync(tombstone)) fs.unlinkSync(tombstone);
+          fs.renameSync(targetPath, tombstone);
+        } catch (renameErr) {
+          console.warn('[update] rename failed, trying direct write:', path.basename(targetPath), renameErr.code);
+        }
+      }
+      fs.writeFileSync(targetPath, data);
+      // Best-effort cleanup of the tombstone — it's fine if this fails,
+      // the next update run will remove it on the next pass above.
+      const tombstone = targetPath + '.old';
+      try { if (fs.existsSync(tombstone)) fs.unlinkSync(tombstone); } catch {}
+
+    } else {
+      // Linux: the running executable's inode is locked (ETXTBSY).
+      // Unlinking detaches the directory entry from the live inode so we
+      // can create a fresh file at the same path without disturbing the
+      // inode the kernel still has mapped into memory.
+      try {
+        if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+      } catch (unlinkErr) {
+        console.warn('[update] unlink failed, trying direct write:', path.basename(targetPath), unlinkErr.code);
+      }
+      fs.writeFileSync(targetPath, data);
+    }
+  }
+
   async function extractChangedFiles(zipPath, targetDir) {
     const directory = await unzipper.Open.file(zipPath);
     const platformFolder = os.platform() === 'win32' ? 'win-unpacked' : 'linux-unpacked';
@@ -311,7 +348,7 @@ app.whenReady().then(() => {
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
       }
 
-      fs.writeFileSync(targetPath, remoteData);
+      safeWriteFile(targetPath, remoteData);
       console.log('[update] wrote:', relativePath);
     }
   }

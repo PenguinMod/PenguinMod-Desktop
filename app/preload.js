@@ -20,15 +20,15 @@ const themeTracker = { callback: null };
 // =========================================================================
 contextBridge.exposeInMainWorld('__electronInternalBridge', {
   alert: (msg) => sendSync('electron-alert', String(msg ?? '')),
-                                confirm: (msg) => !!sendSync('electron-confirm', String(msg ?? '')),
-                                prompt: (msg, def) => sendSync('electron-prompt-sync', { message: msg, defaultValue: def }),
+  confirm: (msg) => !!sendSync('electron-confirm', String(msg ?? '')),
+  prompt: (msg, def) => sendSync('electron-prompt-sync', { message: msg, defaultValue: def }),
 
-                                // This notifies our preload script when the user changes themes on the website
-                                notifyThemeChanged: (isDark) => {
-                                  if (typeof themeTracker.callback === 'function') {
-                                    themeTracker.callback(isDark);
-                                  }
-                                }
+  // This notifies our preload script when the user changes themes on the website
+  notifyThemeChanged: (isDark) => {
+    if (typeof themeTracker.callback === 'function') {
+      themeTracker.callback(isDark);
+    }
+  }
 });
 
 contextBridge.exposeInMainWorld('__electronUpdaterBridge', {
@@ -252,10 +252,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   document.body.appendChild(overlay);
 
-  const updateBar         = overlay.querySelector('#update-bar');
-  const updatePhaseLabel  = overlay.querySelector('#update-phase-label');
-  const updatePctLabel    = overlay.querySelector('#update-pct-label');
-  const updateStatus      = overlay.querySelector('#update-status');
+  const updateBar = overlay.querySelector('#update-bar');
+  const updatePhaseLabel = overlay.querySelector('#update-phase-label');
+  const updatePctLabel = overlay.querySelector('#update-pct-label');
+  const updateStatus = overlay.querySelector('#update-status');
   const updateIndeterminate = overlay.querySelector('#update-indeterminate');
 
   // Animate indeterminate pulsing dot
