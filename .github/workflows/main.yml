@@ -22,19 +22,16 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /var/cache/apt
-          key: apt-cache-${{ runner.os }}-${{ hashFiles('**/apt-packages.txt') }}
+          key: apt-cache-${{ runner.os }}-wine
           restore-keys: |
             apt-cache-${{ runner.os }}-
-
+      
       # --- Install system dependencies ---
       - name: Install system dependencies
         run: |
-          # Add architecture and install packages from file
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          xargs -a apt-packages.txt sudo apt-get install -y
-        # Make a file listing all packages for cache hashing
-      - run: echo -e "git\ncurl\njq\nzip\nunzip\nwine32\nwine64" > apt-packages.txt
+          sudo apt-get install -y git curl jq zip unzip wine32 wine64
 
       # --- Install Bun ---
       - name: Install Bun
