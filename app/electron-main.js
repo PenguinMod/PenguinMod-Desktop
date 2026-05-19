@@ -29,6 +29,21 @@ const folders = {
   sharkpools: path.join(__dirname, 'SharkPools-Extensions')
 };
 
+function getInstallDir() {
+  const platformFolder = os.platform() === 'win32' ? 'win-unpacked' : 'linux-unpacked';
+  let dir = __dirname;
+  while (true) {
+    if (path.basename(dir) === platformFolder) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      // Hit filesystem root without finding it — fall back
+      console.warn('[update] Could not locate install root, falling back to __dirname');
+      return __dirname;
+    }
+    dir = parent;
+  }
+}
+
 function getStartupSetting() {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
@@ -180,7 +195,7 @@ app.whenReady().then(() => {
       if (choice !== 0) {
         return { success: false, message: 'Update cancelled.' };
       }
-
+      /*
       // Show non-blocking progress notice
       dialog.showMessageBox(mainWindow, {
         type: 'info',
@@ -190,13 +205,14 @@ app.whenReady().then(() => {
         detail: 'The app will restart automatically when complete.',
         noLink: true
       });
+      */
 
       // Download to temp dir
       const tmpZip = path.join(os.tmpdir(), `penguinmod-update-${Date.now()}.zip`);
       await downloadFile(asset.browser_download_url, tmpZip);
 
       // Extract, only writing files that have changed
-      await extractChangedFiles(tmpZip, __dirname);
+      await extractChangedFiles(tmpZip, getInstallDir());
 
       // Clean up
       try { fs.unlinkSync(tmpZip); } catch {}
@@ -212,6 +228,12 @@ app.whenReady().then(() => {
     }
   });
 
+  function sendUpdateProgress(phase, percent, status) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-progress', { phase, percent, status });
+    }
+  }
+
   async function downloadFile(url, destPath) {
     const res = await net.fetch(url, {
       headers: { 'Accept': 'application/octet-stream' }
@@ -221,24 +243,76 @@ app.whenReady().then(() => {
       throw new Error(`Download failed: HTTP ${res.status} from ${url}`);
     }
 
+    const total = parseInt(res.headers.get('content-length') || '0', 10);
+    let received = 0;
+
+    const reader = res.body.getReader();
     const fileStream = createWriteStream(destPath);
-    await streamPipeline(res.body, fileStream);
+
+    await new Promise((resolve, reject) => {
+      fileStream.on('error', reject);
+
+      function pump() {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            fileStream.end(resolve);
+            return;
+          }
+          received += value.length;
+          const mb = (received / 1024 / 1024).toFixed(1);
+          if (total > 0) {
+            const totalMb = (total / 1024 / 1024).toFixed(1);
+            const pct = Math.round((received / total) * 100);
+            sendUpdateProgress('download', pct, `Downloading… ${mb} / ${totalMb} MB`);
+          } else {
+            sendUpdateProgress('download', -1, `Downloading… ${mb} MB`);
+          }
+          fileStream.write(Buffer.from(value), (err) => {
+            if (err) return reject(err);
+            pump();
+          });
+        }).catch(reject);
+      }
+      pump();
+    });
   }
 
   async function extractChangedFiles(zipPath, targetDir) {
     const directory = await unzipper.Open.file(zipPath);
-    for (const entry of directory.files) {
-      if (entry.type !== 'File') continue;
-      const targetPath = path.join(targetDir, entry.path);
+    const platformFolder = os.platform() === 'win32' ? 'win-unpacked' : 'linux-unpacked';
+    const stripPrefix = `builds/${platformFolder}/`;
+
+    const eligible = directory.files.filter(
+      entry => entry.type === 'File' && entry.path.startsWith(stripPrefix)
+    );
+    const total = eligible.length;
+    let i = 0;
+
+    for (const entry of eligible) {
+      i++;
+      const relativePath = entry.path.slice(stripPrefix.length);
+      if (!relativePath) continue;
+
+      const pct = Math.round((i / total) * 100);
+      sendUpdateProgress('extract', pct, relativePath);
+
+      const targetPath = path.join(targetDir, relativePath);
+
+      // Prevent directory traversal
+      const rel = path.relative(targetDir, targetPath);
+      if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue;
 
       const remoteData = await entry.buffer();
+
       if (fs.existsSync(targetPath)) {
         const localData = fs.readFileSync(targetPath);
         if (Buffer.compare(localData, remoteData) === 0) continue;
       } else {
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
       }
+
       fs.writeFileSync(targetPath, remoteData);
+      console.log('[update] wrote:', relativePath);
     }
   }
 
