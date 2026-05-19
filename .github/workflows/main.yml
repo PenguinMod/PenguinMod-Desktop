@@ -22,7 +22,7 @@ jobs:
       - name: Cache APT packages
         uses: actions/cache@v3
         with:
-          path: /var/cache/apt
+          path: apt-cache
           key: apt-cache-${{ runner.os }}-wine
           restore-keys: |
             apt-cache-${{ runner.os }}-
@@ -32,7 +32,18 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y git curl jq zip unzip wine32 wine64
+          
+          # 1. Create a local directory for the cached .deb files
+          mkdir -p apt-cache
+          
+          # 2. Download missing dependencies into the local folder instead of /var/cache/apt
+          sudo apt-get install -y -d -o dir::cache::archives="$(pwd)/apt-cache" git curl jq zip unzip wine32 wine64
+          
+          # 3. Install the packages from your local cache folder
+          sudo dpkg -i apt-cache/*.deb || sudo apt-get install -f -y
+          
+          # 4. Clean up any leftover root permissions so the runner can cache it safely
+          sudo chown -R runner:runner apt-cache
 
       # --- Install Bun ---
       - name: Install Bun
