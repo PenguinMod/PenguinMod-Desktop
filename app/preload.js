@@ -115,8 +115,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   <div id="settings-label-node" style="font-size:13px;">
   <label style="display:block; margin-bottom:6px; font-weight:500;">Default Startup Page:</label>
   <select id="startup-page-select" style="width:100%; padding:6px; border-radius:6px; outline:none; transition: background 0.2s ease, color 0.2s ease;">
-  <option value="home">Home Page</option>
-  <option value="editor">Editor Page</option>
+  <option value="home">PenguinMod Editor</option>
+  <option value="editor">PenguinMod Home Page</option>
   </select>
   </div>
   `;
