@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # --- Checkout ---
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -25,7 +26,7 @@ jobs:
           key: apt-cache-${{ runner.os }}-wine
           restore-keys: |
             apt-cache-${{ runner.os }}-
-      
+
       # --- Install system dependencies ---
       - name: Install system dependencies
         run: |
@@ -43,77 +44,153 @@ jobs:
         with:
           node-version: 26
 
-      # --- Cache Bun & node_modules ---
-      - name: Cache Bun & node_modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.bun
-            penguinmod.github.io/node_modules
-          key: bun-deps-${{ hashFiles('**/bun.lockb') }}
+      # --- Clone repos and cache per-repo node_modules ---
 
-      # --- Clone repositories & install Bun deps ---
+      # PenguinMod Extension Gallery
       - name: Clone PenguinMod Extension Gallery
         run: git clone --depth=1 https://github.com/PenguinMod/PenguinMod-ExtensionsGallery.git
 
+      # TurboWarp Extension Gallery
       - name: Clone TurboWarp Extension Gallery
+        run: git clone --depth=1 https://github.com/TurboWarp/extensions.git TurboWarp-ExtensionsGallery
+
+      - name: Cache TurboWarp node_modules
+        uses: actions/cache@v3
+        with:
+          path: TurboWarp-ExtensionsGallery/node_modules
+          key: node-modules-turbowarp
+          restore-keys: node-modules-turbowarp
+
+      - name: Install TurboWarp deps
         run: |
-          git clone --depth=1 https://github.com/TurboWarp/extensions.git TurboWarp-ExtensionsGallery
           cd TurboWarp-ExtensionsGallery
-          bun i --force
+          bun i
           bun run build
 
+      # SharkPool Extension Gallery
       - name: Clone SharkPool Extension Gallery
         run: git clone --depth=1 https://github.com/SharkPool-SP/SharkPools-Extensions.git
 
-      - name: Clone PenguinMod home
+      # PenguinMod Home
+      - name: Clone PenguinMod Home
+        run: git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Home.git
+
+      - name: Cache PenguinMod Home node_modules
+        uses: actions/cache@v3
+        with:
+          path: PenguinMod-Home/node_modules
+          key: node-modules-penguinmod-home
+          restore-keys: node-modules-penguinmod-home
+
+      - name: Install PenguinMod Home deps
         run: |
-          git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Home.git
           cd PenguinMod-Home
           mv .env.template .env
-          bun i --force
+          bun i
 
-      - name: Clone PenguinMod GUI & submodules
+      # PenguinMod GUI
+      - name: Clone PenguinMod GUI
+        run: git clone --depth=1 https://github.com/PenguinMod/penguinmod.github.io.git
+
+      - name: Cache GUI node_modules
+        uses: actions/cache@v3
+        with:
+          path: penguinmod.github.io/node_modules
+          key: node-modules-penguinmod-gui
+          restore-keys: node-modules-penguinmod-gui
+
+      - name: Install GUI deps
         run: |
-          git clone --depth=1 https://github.com/PenguinMod/penguinmod.github.io.git
           cd penguinmod.github.io
-          bun i --force
+          bun i
 
+      # PenguinMod VM
+      - name: Clone PenguinMod VM
+        run: |
+          cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Vm.git
-          cd PenguinMod-Vm
-          bun i --force
+
+      - name: Cache VM node_modules
+        uses: actions/cache@v3
+        with:
+          path: penguinmod.github.io/PenguinMod-Vm/node_modules
+          key: node-modules-penguinmod-vm
+          restore-keys: node-modules-penguinmod-vm
+
+      - name: Install VM deps
+        run: |
+          cd penguinmod.github.io/PenguinMod-Vm
+          bun i
           cd ..
           rm -rf node_modules/scratch-vm
           mv PenguinMod-Vm node_modules/scratch-vm
 
+      # PenguinMod Blocks
+      - name: Clone PenguinMod Blocks
+        run: |
+          cd penguinmod.github.io
           git clone --depth=1 -b develop-builds https://github.com/PenguinMod/PenguinMod-Blocks.git
-          cd PenguinMod-Blocks
-          bun i --force
+
+      - name: Cache Blocks node_modules
+        uses: actions/cache@v3
+        with:
+          path: penguinmod.github.io/PenguinMod-Blocks/node_modules
+          key: node-modules-penguinmod-blocks
+          restore-keys: node-modules-penguinmod-blocks
+
+      - name: Install Blocks deps
+        run: |
+          cd penguinmod.github.io/PenguinMod-Blocks
+          bun i
           cd ..
           rm -rf node_modules/scratch-blocks
           mv PenguinMod-Blocks node_modules/scratch-blocks
 
+      # PenguinMod Render
+      - name: Clone PenguinMod Render
+        run: |
+          cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Render.git
-          cd PenguinMod-Render
+
+      - name: Cache Render node_modules
+        uses: actions/cache@v3
+        with:
+          path: penguinmod.github.io/PenguinMod-Render/node_modules
+          key: node-modules-penguinmod-render
+          restore-keys: node-modules-penguinmod-render
+
+      - name: Install Render deps
+        run: |
+          cd penguinmod.github.io/PenguinMod-Render
           rm -f package-lock.json
-          bun i --force
+          bun i
           cd ..
           rm -rf node_modules/scratch-render
           mv PenguinMod-Render node_modules/scratch-render
 
+      # PenguinMod Paint
+      - name: Clone PenguinMod Paint
+        run: |
+          cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Paint.git
-          cd PenguinMod-Paint
-          bun i --force
+
+      - name: Cache Paint node_modules
+        uses: actions/cache@v3
+        with:
+          path: penguinmod.github.io/PenguinMod-Paint/node_modules
+          key: node-modules-penguinmod-paint
+          restore-keys: node-modules-penguinmod-paint
+
+      - name: Install Paint deps
+        run: |
+          cd penguinmod.github.io/PenguinMod-Paint
+          bun i
           cd ..
           rm -rf node_modules/scratch-paint
           mv PenguinMod-Paint node_modules/scratch-paint
 
-      # --- Final Bun install for project ---
-      - name: Install deps
-        run: bun i --force
-
-      # --- Build web app ---
-      - name: Build PenguinMod
+      # --- Build Web App ---
+      - name: Build PenguinMod Web
         run: |
           cd penguinmod.github.io
           bun run build
@@ -127,18 +204,18 @@ jobs:
           cp -R PenguinMod-ExtensionsGallery SharkPools-Extensions app/
           cp -R TurboWarp-ExtensionsGallery/build app/TurboWarp-ExtensionsGallery
 
-      # --- Install only production deps ---
+      # --- Install prod-only deps ---
       - name: Install production deps
         run: |
           rm -rf node_modules
           mkdir node_modules
-          bun i --force --omit=dev
+          bun i --omit=dev
 
       # --- Build Electron App ---
       - name: Build Electron App
         run: npx electron-builder --linux AppImage deb rpm --win nsis --publish never
 
-      # --- Zip and Upload artifacts ---
+      # --- Zip artifacts ---
       - name: Zip linux-unpacked
         run: zip -r builds/linux-unpacked.zip builds/linux-unpacked
 
