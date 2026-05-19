@@ -5,6 +5,7 @@ on:
   push:
   schedule:
     - cron: '0 6 * * *'
+
 env:
   NODE_ENV: 'production'
 
@@ -16,25 +17,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # --- Cache APT packages ---
+      - name: Cache APT packages
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/apt
+          key: apt-cache-${{ runner.os }}-${{ hashFiles('**/apt-packages.txt') }}
+          restore-keys: |
+            apt-cache-${{ runner.os }}-
+
+      # --- Install system dependencies ---
+      - name: Install system dependencies
+        run: |
+          # Add architecture and install packages from file
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          xargs -a apt-packages.txt sudo apt-get install -y
+        # Make a file listing all packages for cache hashing
+      - run: echo -e "git\ncurl\njq\nzip\nunzip\nwine32\nwine64" > apt-packages.txt
+
+      # --- Install Bun ---
       - name: Install Bun
         uses: oven-sh/setup-bun@v1
 
+      # --- Install Node.js ---
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 26
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git curl jq zip unzip
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y wine32 wine64
+      # --- Cache Bun & node_modules ---
+      - name: Cache Bun & node_modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.bun
+            penguinmod.github.io/node_modules
+          key: bun-deps-${{ hashFiles('**/bun.lockb') }}
 
+      # --- Clone repositories & install Bun deps ---
       - name: Clone PenguinMod Extension Gallery
-        run: |
-          git clone --depth=1 https://github.com/PenguinMod/PenguinMod-ExtensionsGallery.git
+        run: git clone --depth=1 https://github.com/PenguinMod/PenguinMod-ExtensionsGallery.git
 
       - name: Clone TurboWarp Extension Gallery
         run: |
@@ -44,26 +67,21 @@ jobs:
           bun run build
 
       - name: Clone SharkPool Extension Gallery
-        run: |
-          git clone --depth=1 https://github.com/SharkPool-SP/SharkPools-Extensions.git
+        run: git clone --depth=1 https://github.com/SharkPool-SP/SharkPools-Extensions.git
 
       - name: Clone PenguinMod home
         run: |
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Home.git
           cd PenguinMod-Home
-          mv .env.template .env # important for building lol
+          mv .env.template .env
           bun i --force
 
-      # Clone PenguinMod GUI and submodules
-      - name: Clone PenguinMod GUI
+      - name: Clone PenguinMod GUI & submodules
         run: |
           git clone --depth=1 https://github.com/PenguinMod/penguinmod.github.io.git
           cd penguinmod.github.io
           bun i --force
 
-      - name: Clone PenguinMod VM
-        run: |
-          cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Vm.git
           cd PenguinMod-Vm
           bun i --force
@@ -71,9 +89,6 @@ jobs:
           rm -rf node_modules/scratch-vm
           mv PenguinMod-Vm node_modules/scratch-vm
 
-      - name: Clone PenguinMod Blocks
-        run: |
-          cd penguinmod.github.io
           git clone --depth=1 -b develop-builds https://github.com/PenguinMod/PenguinMod-Blocks.git
           cd PenguinMod-Blocks
           bun i --force
@@ -81,20 +96,14 @@ jobs:
           rm -rf node_modules/scratch-blocks
           mv PenguinMod-Blocks node_modules/scratch-blocks
 
-      - name: Clone PenguinMod Renderer
-        run: |
-          cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Render.git
           cd PenguinMod-Render
-          rm -f package-lock.json # hopefully fix this step taking like a minute for no reason
+          rm -f package-lock.json
           bun i --force
           cd ..
           rm -rf node_modules/scratch-render
           mv PenguinMod-Render node_modules/scratch-render
 
-      - name: Clone PenguinMod Paint
-        run: |
-          cd penguinmod.github.io
           git clone --depth=1 https://github.com/PenguinMod/PenguinMod-Paint.git
           cd PenguinMod-Paint
           bun i --force
@@ -102,11 +111,11 @@ jobs:
           rm -rf node_modules/scratch-paint
           mv PenguinMod-Paint node_modules/scratch-paint
 
-
+      # --- Final Bun install for project ---
       - name: Install deps
         run: bun i --force
 
-      # Build web app
+      # --- Build web app ---
       - name: Build PenguinMod
         run: |
           cd penguinmod.github.io
@@ -121,82 +130,28 @@ jobs:
           cp -R PenguinMod-ExtensionsGallery SharkPools-Extensions app/
           cp -R TurboWarp-ExtensionsGallery/build app/TurboWarp-ExtensionsGallery
 
-      - name: Install non development packages
+      # --- Install only production deps ---
+      - name: Install production deps
         run: |
-         rm -rf node_modules
-         mkdir node_modules
-         bun i --force --omit=dev
+          rm -rf node_modules
+          mkdir node_modules
+          bun i --force --omit=dev
 
-      #- name: Copy non development node_modules to app/
-        #run: |
-          #cp -R node_modules app/
-      # Build desktop app
+      # --- Build Electron App ---
       - name: Build Electron App
         run: npx electron-builder --linux AppImage deb rpm --win nsis --publish never
 
-      # --- Zip unpacked folders first ---
+      # --- Zip and Upload artifacts ---
       - name: Zip linux-unpacked
         run: zip -r builds/linux-unpacked.zip builds/linux-unpacked
 
       - name: Zip win-unpacked
         run: zip -r builds/win-unpacked.zip builds/win-unpacked
 
-      # --- Upload Linux .deb ---
-      - name: Upload Linux .deb
-        run: echo "ARTIFACT_NAME=$(basename builds/*.deb)" >> $GITHUB_ENV
-      - name: Upload Linux .deb artifact
+      # --- Upload artifacts ---
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: builds/*.deb
-          archive: false
-
-      # --- Upload Linux .rpm ---
-      - name: Upload Linux .rpm
-        run: echo "ARTIFACT_NAME=$(basename builds/*.rpm)" >> $GITHUB_ENV
-      - name: Upload Linux .rpm artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: builds/*.rpm
-          archive: false
-
-      # --- Upload Linux AppImage ---
-      - name: Upload Linux AppImage
-        run: echo "ARTIFACT_NAME=$(basename builds/*.AppImage)" >> $GITHUB_ENV
-      - name: Upload Linux AppImage artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: builds/*.AppImage
-          archive: false
-
-      # --- Upload linux-unpacked zip ---
-      - name: Upload linux-unpacked
-        run: echo "ARTIFACT_NAME=$(basename builds/linux-unpacked.zip)" >> $GITHUB_ENV
-      - name: Upload linux-unpacked artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: builds/linux-unpacked.zip
-          archive: false
-
-      # --- Upload win-unpacked zip ---
-      - name: Upload win-unpacked
-        run: echo "ARTIFACT_NAME=$(basename builds/win-unpacked.zip)" >> $GITHUB_ENV
-      - name: Upload win-unpacked artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: builds/win-unpacked.zip
-          archive: false
-
-      # --- Upload Windows installer .exe ---
-      - name: Upload Windows installer
-        run: echo "ARTIFACT_NAME=$(basename builds/*.exe)" >> $GITHUB_ENV
-      - name: Upload Windows installer artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: builds/*.exe
+          name: all-artifacts
+          path: builds/
           archive: false
