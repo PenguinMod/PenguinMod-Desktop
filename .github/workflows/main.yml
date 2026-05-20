@@ -182,7 +182,7 @@ jobs:
           bun run build
           cp -R public ../app
           cd ..
-          SharkPools-Extensions app/
+          cp -R SharkPools-Extensions app/
           cp -R TurboWarp-ExtensionsGallery/build app/TurboWarp-ExtensionsGallery
           cp -R PenguinMod-ExtensionsGallery/public app/PenguinMod-ExtensionsGallery
 
