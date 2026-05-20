@@ -1,3 +1,7 @@
+# WARNING:
+### This app is currently a work and progress, stabilty is not guaranteed, bugs might occur, and breaking changes might happen!
+### Use at your own risk!
+
 # PenguinMod Desktop
 A native [PenguinMod](https://penguinmod.com) desktop app for Linux and Windows that has good offline usage support.
 
