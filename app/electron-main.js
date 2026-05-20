@@ -467,6 +467,39 @@ function createWindow() {
     setupDialogs();
 
     mainWindow.on('closed', () => mainWindow = null);
+    //
+    // Handle pages that try to prevent unload (beforeunload)
+    // We do NOT automatically call event.preventDefault() here because
+    // you said you want the user to decide — the preload will route
+    // confirm/prompt/alert into main dialogs so the user still sees UI.
+    //
+    let isUnloadDialogOpen = false;
+
+    mainWindow.webContents.on('will-prevent-unload', (event) => {
+      if (isUnloadDialogOpen) {
+        console.log('[main] will-prevent-unload fired, but dialog already open — skipping');
+        return;
+      }
+
+      isUnloadDialogOpen = true;
+
+      const { dialog } = require('electron');
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'warning',
+        buttons: ['Leave', 'Cancel'],
+        defaultId: 0,
+          cancelId: 1,
+          message: 'The page is trying to prevent unload. Do you want to leave?',
+          detail: 'Any unsaved changes may be lost.'
+      });
+
+      isUnloadDialogOpen = false;
+
+      if (choice === 0) {
+        // allow unload
+        event.preventDefault();
+      }
+    });
     mainWindow.webContents.on('render-process-gone', () => createWindow());
     mainWindow.webContents.on('crashed', () => createWindow());
     mainWindow.on('unresponsive', () => {

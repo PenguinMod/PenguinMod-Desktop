@@ -20,15 +20,15 @@ const themeTracker = { callback: null };
 // =========================================================================
 contextBridge.exposeInMainWorld('__electronInternalBridge', {
   alert: (msg) => sendSync('electron-alert', String(msg ?? '')),
-  confirm: (msg) => !!sendSync('electron-confirm', String(msg ?? '')),
-  prompt: (msg, def) => sendSync('electron-prompt-sync', { message: msg, defaultValue: def }),
+                                confirm: (msg) => !!sendSync('electron-confirm', String(msg ?? '')),
+                                prompt: (msg, def) => sendSync('electron-prompt-sync', { message: msg, defaultValue: def }),
 
-  // This notifies our preload script when the user changes themes on the website
-  notifyThemeChanged: (isDark) => {
-    if (typeof themeTracker.callback === 'function') {
-      themeTracker.callback(isDark);
-    }
-  }
+                                // This notifies our preload script when the user changes themes on the website
+                                notifyThemeChanged: (isDark) => {
+                                  if (typeof themeTracker.callback === 'function') {
+                                    themeTracker.callback(isDark);
+                                  }
+                                }
 });
 
 contextBridge.exposeInMainWorld('__electronUpdaterBridge', {
@@ -84,7 +84,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   gap: 10px;
   `;
 
-  // Main floating button (Shadow removed)
+  // Main floating button
   const mainBtn = document.createElement('button');
   mainBtn.innerHTML = '<svg class="svg-icon" style="width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M512.085333 661.333333a149.333333 149.333333 0 0 1-149.333333-149.333333 149.333333 149.333333 0 0 1 149.333333-149.333333 149.333333 149.333333 0 0 1 149.333334 149.333333 149.333333 149.333333 0 0 1-149.333334 149.333333m317.013334-107.946666c1.706667-13.653333 2.986667-27.306667 2.986666-41.386667s-1.28-28.16-2.986666-42.666667l90.026666-69.546666c8.106667-6.4 10.24-17.92 5.12-27.306667l-85.333333-147.626667c-5.12-9.386667-16.64-13.226667-26.026667-9.386666l-106.24 42.666666c-22.186667-16.64-45.226667-31.146667-72.106666-41.813333l-15.786667-113.066667a21.589333 21.589333 0 0 0-21.333333-17.92h-170.666667c-10.666667 0-19.626667 7.68-21.333333 17.92l-15.786667 113.066667c-26.88 10.666667-49.92 25.173333-72.106667 41.813333l-106.24-42.666666c-9.386667-3.84-20.906667 0-26.026666 9.386666l-85.333334 147.626667c-5.546667 9.386667-2.986667 20.906667 5.12 27.306667L195.072 469.333333c-1.706667 14.506667-2.986667 28.586667-2.986667 42.666667s1.28 27.733333 2.986667 41.386667l-90.026667 70.826666c-8.106667 6.4-10.666667 17.92-5.12 27.306667l85.333334 147.626667c5.12 9.386667 16.64 12.8 26.026666 9.386666l106.24-43.093333c22.186667 17.066667 45.226667 31.573333 72.106667 42.24l15.786667 113.066667c1.706667 10.24 10.666667 17.92 21.333333 17.92h170.666667c10.666667 0 19.626667-7.68 21.333333-17.92l15.786667-113.066667c26.88-11.093333 49.92-25.173333 72.106666-42.24l106.24 43.093333c9.386667 3.413333 20.906667 0 26.026667-9.386666l85.333333-147.626667c5.12-9.386667 2.986667-20.906667-5.12-27.306667z" fill="#FFFFFF" /></svg>';
   mainBtn.style.cssText = `
@@ -101,6 +101,66 @@ window.addEventListener('DOMContentLoaded', async () => {
   justify-content: center;
   transition: transform 0.1s ease;
   `;
+
+  // ── Drag logic ────────────────────────────────────────────────────────────
+  // We position the container with `left`+`top` once dragging starts so we
+  // can anchor it anywhere on screen, not just the initial bottom-right corner.
+  let isDragging = false;
+  let didDrag = false;           // distinguishes a drag from a plain click
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  mainBtn.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;  // left button only; right is handled separately
+    isDragging = true;
+    didDrag = false;
+    mainBtn.setPointerCapture(e.pointerId);
+    mainBtn.style.cursor = 'grabbing';
+
+    // Snapshot current position into left/top so we can move freely
+    const rect = container.getBoundingClientRect();
+    container.style.right  = 'auto';
+    container.style.bottom = 'auto';
+    container.style.left   = rect.left + 'px';
+    container.style.top    = rect.top  + 'px';
+
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+  });
+
+  mainBtn.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    didDrag = true;
+
+    let newLeft = e.clientX - dragOffsetX;
+    let newTop  = e.clientY - dragOffsetY;
+
+    // Clamp so the button never leaves the viewport
+    const btnSize = 50;
+    newLeft = Math.max(0, Math.min(window.innerWidth  - btnSize, newLeft));
+    newTop  = Math.max(0, Math.min(window.innerHeight - btnSize, newTop));
+
+    container.style.left = newLeft + 'px';
+    container.style.top  = newTop  + 'px';
+  });
+
+  mainBtn.addEventListener('pointerup', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    mainBtn.style.cursor = 'grab';
+    // If the pointer barely moved, treat it as a click (panel toggle below)
+    if (!didDrag) {
+      panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    }
+  });
+
+  // ── Right-click to remove ─────────────────────────────────────────────────
+  mainBtn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    container.remove();
+  });
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Settings menu panel layout
   const panel = document.createElement('div');
@@ -131,7 +191,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   const updateBtn = document.createElement('button');
   updateBtn.textContent = 'Check for Update';
-  updateBtn.style.cssText = `padding: 6px 12px; border-radius: 6px; border: none; background: #28a745; color: white; cursor: pointer;`;
+  updateBtn.style.cssText = `padding: 6px 12px; border-radius: 6px; border: none; background: #00c3ff; color: #f0f0f0; cursor: pointer;`;
   panel.appendChild(updateBtn);
 
   container.appendChild(panel);
@@ -166,6 +226,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   themeTracker.callback = (isDark) => {
     panel.style.background = isDark ? '#1e1e1e' : '#ffffff';
     panel.style.color = isDark ? '#f0f0f0' : '#333333';
+    updateBtn.style.background = isDark ? "#009CCC" : "00c3ff";
+    updateBtn.style.color = isDark ? '#f0f0f0' : '#f0f0f0';
   };
 
   mainBtn.addEventListener('click', () => {
