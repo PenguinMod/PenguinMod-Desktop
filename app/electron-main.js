@@ -15,10 +15,6 @@ const { createWriteStream } = require("fs");
 const { pipeline } = require("stream");
 const { promisify } = require("util");
 const unzipper = require("unzipper");
-<<<<<<< HEAD
-const streamPipeline = promisify(pipeline);
-=======
->>>>>>> 16f8dfc (gtgjjt)
 
 let mainWindow = null;
 let isQuitting = false;
@@ -408,10 +404,6 @@ app.whenReady().then(() => {
                 }
             }
 
-<<<<<<< HEAD
-            // 3. Fallback Route Mapping for Extensions
-            const filePath = getLocalFile(request.url);
-=======
             if (url.host === "extensions.penguinmod.com") {
               let filename = url.pathname.replace(/^\/+/, "");
               if (!filename || filename === "index.html" || filename === "") filename = "index.html";
@@ -447,7 +439,6 @@ app.whenReady().then(() => {
             // 3. Fallback Route Mapping for Extensions
             const filePath = getLocalFile(request.url);
             console.log(filePath);
->>>>>>> 16f8dfc (gtgjjt)
             if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
                 return net.fetch("file://" + filePath);
             }
