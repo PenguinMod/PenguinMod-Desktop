@@ -426,7 +426,6 @@ app.whenReady().then(() => {
 
             if (["sharkpools-extensions.vercel.app", "sharkpool-sp.github.io"].includes(url.host)) {
               let filename = url.pathname.replace(/^\/+/, "");
-              console.log(filename);
               if (filename.startsWith("SharkPools-Extensions")) filename = filename.replace("SharkPools-Extensions", "");
               if (!filename || filename === "index.html" || filename === "") filename = "index.html";
 
@@ -438,7 +437,6 @@ app.whenReady().then(() => {
 
             // 3. Fallback Route Mapping for Extensions
             const filePath = getLocalFile(request.url);
-            console.log(filePath);
             if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
                 return net.fetch("file://" + filePath);
             }
