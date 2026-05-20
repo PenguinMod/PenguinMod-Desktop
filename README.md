@@ -5,6 +5,9 @@
 # PenguinMod Desktop
 A native [PenguinMod](https://penguinmod.com) desktop app for Linux and Windows that has good offline usage support.
 
+# How do i get it?
+Download the latest release, use the correct file for your platform, MacOS is NOT supported right now! There is an updater built into the app(in the settings menu)
+
 ### This app contains the following offline:
   - [PenguinMod Editor](https://github.com/PenguinMod/penguinmod.github.io)
   - [PenguinMod Home Page](https://github.com/PenguinMod/PenguinMod-Home) (even though most of it won't work without wifi)
