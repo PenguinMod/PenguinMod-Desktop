@@ -20,4 +20,4 @@ Yes, this app contains the three common extension galleries offline, as long as 
 Based on [Desk Penguin](https://github.com/TheShovel/Desk-Penguin/) by [TheShovel](https://github.com/TheShovel) and [NodeJs Desk Penguin](https://github.com/FreshPenguin112/NodeJs-Desk-Penguin) by [FreshPenguin112](https://github.com/FreshPenguin112).
 
 ## Disclaimer:
-Generative AI was used in the creation of this program, much like the previous "Official Desktop App", this program does however work correctly, meaning the usage of such tooling is not necessarily an issue.
+Generative AI was used in the creation of this program.
