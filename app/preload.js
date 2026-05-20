@@ -1,3 +1,4 @@
+// preload.js
 const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 // =========================================================================
@@ -20,15 +21,15 @@ const themeTracker = { callback: null };
 // =========================================================================
 contextBridge.exposeInMainWorld('__electronInternalBridge', {
   alert: (msg) => sendSync('electron-alert', String(msg ?? '')),
-                                confirm: (msg) => !!sendSync('electron-confirm', String(msg ?? '')),
-                                prompt: (msg, def) => sendSync('electron-prompt-sync', { message: msg, defaultValue: def }),
+  confirm: (msg) => !!sendSync('electron-confirm', String(msg ?? '')),
+  prompt: (msg, def) => sendSync('electron-prompt-sync', { message: msg, defaultValue: def }),
 
-                                // This notifies our preload script when the user changes themes on the website
-                                notifyThemeChanged: (isDark) => {
-                                  if (typeof themeTracker.callback === 'function') {
-                                    themeTracker.callback(isDark);
-                                  }
-                                }
+  // This notifies our preload script when the user changes themes on the website
+  notifyThemeChanged: (isDark) => {
+    if (typeof themeTracker.callback === 'function') {
+      themeTracker.callback(isDark);
+    }
+  }
 });
 
 contextBridge.exposeInMainWorld('__electronUpdaterBridge', {
@@ -36,52 +37,25 @@ contextBridge.exposeInMainWorld('__electronUpdaterBridge', {
 });
 
 // =========================================================================
-// 3. SECURE MAIN WORLD INJECTION (No raw strings or IPC exposure)
+// 3. SECURE MAIN WORLD INJECTION & UI INITIALIZATION
 // =========================================================================
 window.addEventListener('DOMContentLoaded', async () => {
-  // Cleanly override native dialogs without evaluating strings
-  webFrame.executeJavaScript(`
-  (() => {
-    window.alert = (msg) => window.__electronInternalBridge.alert(msg);
-    window.confirm = (msg) => window.__electronInternalBridge.confirm(msg);
-    window.prompt = (msg, def) => window.__electronInternalBridge.prompt(msg, def);
 
-    // Track theme mutations safely on the main window context
-    const dispatchTheme = () => {
-      const homeDark = localStorage.getItem('darkmode') === 'true';
-      const editorTheme = localStorage.getItem('tw:theme') === 'dark';
-      window.__electronInternalBridge.notifyThemeChanged(homeDark || editorTheme);
-    };
-
-    // Set up listeners for storage changes
-    window.addEventListener('storage', dispatchTheme);
-    const originalSetItem = localStorage.setItem;
-    localStorage.setItem = function(key, value) {
-      originalSetItem.apply(this, arguments);
-      if (key === 'darkmode' || key === 'tw:theme') dispatchTheme();
-    };
-  })();
-  `);
-
-  // =========================================================================
-  // 4. FLOATING SETTINGS UI MANAGEMENT
-  // =========================================================================
+  // ── A. FLOATING SETTINGS UI ELEMENTS CREATION ───────────────────────────
   const currentSetting = await ipcRenderer.invoke('get-startup-setting');
 
-  // Create UI Container
+  // Create UI Container - Locked to button size so dragging is stable
   const container = document.createElement('div');
   container.id = 'electron-settings-floating-ui';
   container.style.cssText = `
   position: fixed;
   bottom: 20px;
   right: 20px;
+  width: 50px;
+  height: 50px;
   z-index: 999999;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
   `;
 
   // Main floating button
@@ -102,22 +76,61 @@ window.addEventListener('DOMContentLoaded', async () => {
   transition: transform 0.1s ease;
   `;
 
-  // ── Drag logic ────────────────────────────────────────────────────────────
-  // We position the container with `left`+`top` once dragging starts so we
-  // can anchor it anywhere on screen, not just the initial bottom-right corner.
+  // Settings menu panel layout
+  const panel = document.createElement('div');
+  panel.style.cssText = `
+  position: absolute;
+  bottom: 60px;
+  right: 0;
+  border-radius: 12px;
+  padding: 16px;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  width: 220px;
+  background: #ffffff; /* Default safety background */
+  color: #333333;      /* FIX: Explicit default dark text so it doesn't inherit website styles */
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  `;
+
+  panel.innerHTML = `
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <strong id="settings-title-node" style="font-size:14px;">Desktop Settings</strong>
+    <button id="hide-settings-ui-btn" style="background:none; border:none; font-size:14px; cursor:pointer; color:#999;">✕</button>
+  </div>
+  <hr id="settings-hr-node" style="border:0; margin:2px 0; border-top: 1px solid rgba(0,0,0,0.1);">
+  <div id="settings-label-node" style="font-size:13px;">
+    <label style="display:block; margin-bottom:6px; font-weight:500;">Default Startup Page:</label>
+    <select id="startup-page-select" style="width:100%; padding:6px; border-radius:6px; outline:none; transition: background 0.2s ease, color 0.2s ease;">
+      <option value="home">PenguinMod Home Page</option>
+      <option value="editor">PenguinMod Editor</option>
+    </select>
+  </div>
+  `;
+
+  const updateBtn = document.createElement('button');
+  updateBtn.textContent = 'Check for Update';
+  updateBtn.style.cssText = `padding: 6px 12px; border-radius: 6px; border: none; background: #00c3ff; color: #f0f0f0; cursor: pointer;`;
+  panel.appendChild(updateBtn);
+
+  container.appendChild(panel);
+  container.appendChild(mainBtn);
+  document.body.appendChild(container);
+
+  // ── B. DRAG / POINTER EVENTS LOGIC ───────────────────────────────────────
   let isDragging = false;
-  let didDrag = false;           // distinguishes a drag from a plain click
+  let didDrag = false;
   let dragOffsetX = 0;
   let dragOffsetY = 0;
 
   mainBtn.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;  // left button only; right is handled separately
+    if (e.button !== 0) return; 
     isDragging = true;
     didDrag = false;
     mainBtn.setPointerCapture(e.pointerId);
     mainBtn.style.cursor = 'grabbing';
 
-    // Snapshot current position into left/top so we can move freely
     const rect = container.getBoundingClientRect();
     container.style.right  = 'auto';
     container.style.bottom = 'auto';
@@ -135,7 +148,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     let newLeft = e.clientX - dragOffsetX;
     let newTop  = e.clientY - dragOffsetY;
 
-    // Clamp so the button never leaves the viewport
     const btnSize = 50;
     newLeft = Math.max(0, Math.min(window.innerWidth  - btnSize, newLeft));
     newTop  = Math.max(0, Math.min(window.innerHeight - btnSize, newTop));
@@ -148,57 +160,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (!isDragging) return;
     isDragging = false;
     mainBtn.style.cursor = 'grab';
-    // If the pointer barely moved, treat it as a click (panel toggle below)
     if (!didDrag) {
       panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
     }
   });
 
-  // ── Right-click to remove ─────────────────────────────────────────────────
   mainBtn.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     e.stopPropagation();
     container.remove();
   });
-  // ─────────────────────────────────────────────────────────────────────────
 
-  // Settings menu panel layout
-  const panel = document.createElement('div');
-  panel.style.cssText = `
-  border-radius: 12px;
-  padding: 16px;
-  display: none;
-  flex-direction: column;
-  gap: 12px;
-  width: 220px;
-  transition: background 0.2s ease, border-color 0.2s ease;
-  `;
-
-  panel.innerHTML = `
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-  <strong id="settings-title-node" style="font-size:14px;">Desktop Settings</strong>
-  <button id="hide-settings-ui-btn" style="background:none; border:none; font-size:14px; cursor:pointer; color:#999;">✕</button>
-  </div>
-  <hr id="settings-hr-node" style="border:0; margin:2px 0;">
-  <div id="settings-label-node" style="font-size:13px;">
-  <label style="display:block; margin-bottom:6px; font-weight:500;">Default Startup Page:</label>
-  <select id="startup-page-select" style="width:100%; padding:6px; border-radius:6px; outline:none; transition: background 0.2s ease, color 0.2s ease;">
-  <option value="home">PenguinMod Home Page</option>
-  <option value="editor">PenguinMod Editor</option>
-  </select>
-  </div>
-  `;
-
-  const updateBtn = document.createElement('button');
-  updateBtn.textContent = 'Check for Update';
-  updateBtn.style.cssText = `padding: 6px 12px; border-radius: 6px; border: none; background: #00c3ff; color: #f0f0f0; cursor: pointer;`;
-  panel.appendChild(updateBtn);
-
-  container.appendChild(panel);
-  container.appendChild(mainBtn);
-  document.body.appendChild(container);
-
-  // Hook Up Update Execution (Preload layer handles IPC directly)
+  // ── C. BUTTON CONNECTIONS & ATTRIBUTES ───────────────────────────────────
   updateBtn.addEventListener('click', async () => {
     updateBtn.disabled = true;
     updateBtn.textContent = 'Checking...';
@@ -212,10 +185,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateBtn.disabled = false;
   });
 
-  // Structural nodes referencing styling locations
-  const titleNode = panel.querySelector('#settings-title-node');
   const hrNode = panel.querySelector('#settings-hr-node');
-  const labelNode = panel.querySelector('#settings-label-node');
   const selectNode = panel.querySelector('#startup-page-select');
 
   selectNode.value = currentSetting || 'home';
@@ -223,23 +193,90 @@ window.addEventListener('DOMContentLoaded', async () => {
     ipcRenderer.send('set-startup-setting', e.target.value);
   });
 
-  themeTracker.callback = (isDark) => {
-    panel.style.background = isDark ? '#1e1e1e' : '#ffffff';
-    panel.style.color = isDark ? '#f0f0f0' : '#333333';
-    updateBtn.style.background = isDark ? "#009CCC" : "00c3ff";
-    updateBtn.style.color = isDark ? '#f0f0f0' : '#f0f0f0';
-  };
-
-  mainBtn.addEventListener('click', () => {
-    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
-  });
-
   panel.querySelector('#hide-settings-ui-btn').addEventListener('click', () => {
     container.style.display = 'none';
   });
-  // =========================================================================
-  // 5. UPDATE PROGRESS OVERLAY
-  // =========================================================================
+
+  // ── D. REGISTER THEME TRACKER CALLBACK ───────────────────────────────────
+  // This must be assigned BEFORE executeJavaScript runs below!
+  themeTracker.callback = (isDark) => {
+    panel.style.background = isDark ? '#1e1e1e' : '#ffffff';
+    panel.style.color = isDark ? '#f0f0f0' : '#333333';
+    hrNode.style.borderTop = isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)';
+    updateBtn.style.background = isDark ? "#009CCC" : "#00c3ff";
+    updateBtn.style.color = '#f0f0f0';
+  };
+
+  // ── E. SECURE MAIN WORLD INJECTION (Triggers dispatchTheme safely) ────────
+  webFrame.executeJavaScript(`
+  (() => {
+    window.alert = (msg) => window.__electronInternalBridge.alert(msg);
+    window.confirm = (msg) => window.__electronInternalBridge.confirm(msg);
+    window.prompt = (msg, def) => window.__electronInternalBridge.prompt(msg, def);
+
+    const dispatchTheme = () => {
+      const homeDark = localStorage.getItem('darkmode') === 'true';
+      const editorTheme = localStorage.getItem('tw:theme') === 'dark';
+      window.__electronInternalBridge.notifyThemeChanged(homeDark || editorTheme);
+    };
+
+    window.addEventListener('storage', dispatchTheme);
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+      originalSetItem.apply(this, arguments);
+      if (key === 'darkmode' || key === 'tw:theme') dispatchTheme();
+    };
+
+    // Immediately update preload script configuration now that components are ready
+    dispatchTheme();
+  })();
+  `);
+
+  // ── F. TARGET BLANK BYPASS OVERRIDE ──────────────────────────────────────
+  const enforceSelfTarget = () => {
+    const anchors = document.getElementsByTagName('a');
+    for (let i = 0; i < anchors.length; i++) {
+      const a = anchors[i];
+      try {
+        if (!a.href) continue;
+        const url = new URL(a.href, window.location.href);
+        const isPenguinHome = url.host === 'penguinmod.com' || url.protocol === 'home:';
+        const isPenguinEditor = url.host === 'studio.penguinmod.com' || url.protocol === 'editor:';
+
+        if (isPenguinHome || isPenguinEditor) {
+          if (a.getAttribute('target') !== '_self') {
+            a.setAttribute('target', '_self');
+          }
+        }
+      } catch (err) {}
+    }
+  };
+
+  enforceSelfTarget();
+
+  const anchorObserver = new MutationObserver((mutations) => {
+    let shouldRun = false;
+    for (let i = 0; i < mutations.length; i++) {
+      const m = mutations[i];
+      if (m.type === 'childList' && m.addedNodes.length > 0) {
+        shouldRun = true;
+        break;
+      } else if (m.type === 'attributes' && m.attributeName === 'target') {
+        shouldRun = true;
+        break;
+      }
+    }
+    if (shouldRun) enforceSelfTarget();
+  });
+
+  anchorObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['target', 'href']
+  });
+
+  // ── G. UPDATE PROGRESS OVERLAY ───────────────────────────────────────────
   const overlay = document.createElement('div');
   overlay.id = 'electron-update-overlay';
   overlay.style.cssText = `
@@ -255,59 +292,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   `;
 
   overlay.innerHTML = `
-  <div id="update-card" style="
-  background: #1c1c1e;
-  color: #f0f0f0;
-  border-radius: 16px;
-  padding: 28px 32px;
-  width: 420px;
-  max-width: 90vw;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  ">
-  <div style="font-size:16px; font-weight:600;" id="update-phase-label">Preparing update...</div>
-  <div style="
-  font-size: 11px;
-  color: #8e8e93;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  font-variant-numeric: tabular-nums;
-  ">PenguinMod Desktop will restart when done</div>
-
-  <div style="
-  background: #3a3a3c;
-  border-radius: 999px;
-  height: 8px;
-  overflow: hidden;
-  width: 100%;
-  ">
-  <div id="update-bar" style="
-  height: 100%;
-  width: 0%;
-  background: #007aff;
-  border-radius: 999px;
-  transition: width 0.15s ease;
-  "></div>
-  </div>
-
-  <div style="display:flex; justify-content:space-between; font-size:12px; color:#aeaeb2;">
-  <span id="update-pct-label">0%</span>
-  <span id="update-indeterminate" style="display:none;">●</span>
-  </div>
-
-  <div id="update-status" style="
-  font-size: 11px;
-  color: #8e8e93;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  font-variant-numeric: tabular-nums;
-  ">Starting...</div>
+  <div id="update-card" style="background: #1c1c1e; color: #f0f0f0; border-radius: 16px; padding: 28px 32px; width: 420px; max-width: 90vw; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+    <div style="font-size:16px; font-weight:600;" id="update-phase-label">Preparing update...</div>
+    <div style="font-size: 11px; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-variant-numeric: tabular-nums;">PenguinMod Desktop will restart when done</div>
+    <div style="background: #3a3a3c; border-radius: 999px; height: 8px; overflow: hidden; width: 100%;"><div id="update-bar" style="height: 100%; width: 0%; background: #007aff; border-radius: 999px; transition: width 0.15s ease;"></div></div>
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:#aeaeb2;"><span id="update-pct-label">0%</span><span id="update-indeterminate" style="display:none;">●</span></div>
+    <div id="update-status" style="font-size: 11px; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-variant-numeric: tabular-nums;">Starting...</div>
   </div>
   `;
 
@@ -319,7 +309,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   const updateStatus = overlay.querySelector('#update-status');
   const updateIndeterminate = overlay.querySelector('#update-indeterminate');
 
-  // Animate indeterminate pulsing dot
   let dotTimer = null;
   function startIndeterminate() {
     const dots = ['●', '○', '●', '○'];
@@ -338,15 +327,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   ipcRenderer.on('update-progress', (_event, { phase, percent, status }) => {
-    // Show overlay on first event
     overlay.style.display = 'flex';
-
-    // Phase label
     updatePhaseLabel.textContent = phase === 'download' ? 'Downloading update…' : 'Extracting files…';
 
-    // Progress bar
     if (percent < 0) {
-      // Indeterminate — content-length unknown
       updateBar.style.width = '100%';
       updateBar.style.animation = 'none';
       updateBar.style.background = 'linear-gradient(90deg, #007aff 0%, #5ac8fa 50%, #007aff 100%)';
@@ -359,8 +343,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       updateBar.style.width = `${percent}%`;
       updatePctLabel.textContent = `${percent}%`;
     }
-
-    // Scrolling status line
     updateStatus.textContent = status;
   });
 });
