@@ -15,3 +15,6 @@ A native [PenguinMod](https://penguinmod.com) desktop app for Linux and Windows 
 Yes, this app contains the three common extension galleries offline, as long as you use extensions from these three galleries that don't rely on stuff like network requests for functionality, it will load.
 
 Based on [Desk Penguin](https://github.com/TheShovel/Desk-Penguin/) by [TheShovel](https://github.com/TheShovel) and [NodeJs Desk Penguin](https://github.com/FreshPenguin112/NodeJs-Desk-Penguin) by [FreshPenguin112](https://github.com/FreshPenguin112).
+
+## Disclaimer:
+Generative AI was used in the creation of this program, much like the previous "Official Desktop App", this program does however work correctly, meaning the usage of such tooling is not necessarily an issue.
