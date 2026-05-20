@@ -15,7 +15,10 @@ const { createWriteStream } = require("fs");
 const { pipeline } = require("stream");
 const { promisify } = require("util");
 const unzipper = require("unzipper");
+<<<<<<< HEAD
 const streamPipeline = promisify(pipeline);
+=======
+>>>>>>> 16f8dfc (gtgjjt)
 
 let mainWindow = null;
 let isQuitting = false;
@@ -405,8 +408,46 @@ app.whenReady().then(() => {
                 }
             }
 
+<<<<<<< HEAD
             // 3. Fallback Route Mapping for Extensions
             const filePath = getLocalFile(request.url);
+=======
+            if (url.host === "extensions.penguinmod.com") {
+              let filename = url.pathname.replace(/^\/+/, "");
+              if (!filename || filename === "index.html" || filename === "") filename = "index.html";
+
+              const filePath = path.join(folders.penguinmod, filename);
+              if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                return net.fetch("file://" + filePath);
+              }
+            }
+
+            if (url.host === "extensions.turbowarp.org") {
+              let filename = url.pathname.replace(/^\/+/, "");
+              if (!filename || filename === "index.html" || filename === "") filename = "index.html";
+
+              const filePath = path.join(folders.turbowarp, filename);
+              if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                return net.fetch("file://" + filePath);
+              }
+            }
+
+            if (["sharkpools-extensions.vercel.app", "sharkpool-sp.github.io"].includes(url.host)) {
+              let filename = url.pathname.replace(/^\/+/, "");
+              console.log(filename);
+              if (filename.startsWith("SharkPools-Extensions")) filename = filename.replace("SharkPools-Extensions", "");
+              if (!filename || filename === "index.html" || filename === "") filename = "index.html";
+
+              const filePath = path.join(folders.sharkpools, filename);
+              if (fs.existsSync(decodeURIComponent(filePath)) && fs.statSync(decodeURIComponent(filePath)).isFile()) {
+                return net.fetch("file://" + filePath);
+              }
+            }
+
+            // 3. Fallback Route Mapping for Extensions
+            const filePath = getLocalFile(request.url);
+            console.log(filePath);
+>>>>>>> 16f8dfc (gtgjjt)
             if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
                 return net.fetch("file://" + filePath);
             }
